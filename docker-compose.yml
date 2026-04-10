@@ -1,0 +1,32 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: oficina-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: oficina_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  api:
+    build: .
+    container_name: oficina-api
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres:5432/oficina_db?schema=public
+    ports:
+      - '3000:3000'
+    command: sh -c "npm run prisma:generate && npm run prisma:migrate:deploy && npm run start"
+
+volumes:
+  postgres_data:
