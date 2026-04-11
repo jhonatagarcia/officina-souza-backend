@@ -6,10 +6,11 @@ export class CreateInventoryItemDto {
   @IsString()
   name!: string;
 
-  @ApiProperty()
+  @ApiPropertyOptional()
   @IsString()
+  @IsOptional()
   @MaxLength(50)
-  internalCode!: string;
+  internalCode?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

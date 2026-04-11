@@ -14,7 +14,7 @@ export class RejectBudgetUseCase {
     const budget = await this.budgetReader.ensureExists(id);
 
     if (budget.status !== BudgetStatus.PENDENTE) {
-      throw new BadRequestException('Only pending budgets can be rejected');
+      throw new BadRequestException('Apenas orcamentos pendentes podem ser rejeitados');
     }
 
     return this.prisma.budget.update({

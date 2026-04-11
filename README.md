@@ -38,6 +38,7 @@ Regras principais implementadas:
 - Peça única por item dentro da OS, com consolidação por chave composta.
 - Bloqueio de entrega antes de finalização.
 - Histórico do veículo alimentado de forma idempotente quando a OS é finalizada.
+- Entrega da OS gera lançamento financeiro a receber automaticamente quando existir orçamento vinculado com total positivo.
 - Checks de banco para valores monetários, quantidades e coerência de datas/status.
 
 ## Estrutura de Pastas

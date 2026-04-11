@@ -7,7 +7,7 @@ export class BudgetTotalsService {
     const subtotal = items.reduce((acc, item) => acc + item.quantity * item.unitPrice, 0);
 
     if (discount > subtotal) {
-      throw new BadRequestException('Discount cannot be greater than subtotal');
+      throw new BadRequestException('O desconto nao pode ser maior que o subtotal');
     }
 
     return {

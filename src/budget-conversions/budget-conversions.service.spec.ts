@@ -45,6 +45,8 @@ describe('BudgetConversionsService', () => {
     });
     prismaMock.serviceOrder.create.mockResolvedValue({
       id: 'os-1',
+      orderNumber: 'OS-1',
+      status: 'ABERTA',
       budgetId: 'budget-1',
       clientId: 'client-1',
       vehicleId: 'vehicle-1',
@@ -56,7 +58,15 @@ describe('BudgetConversionsService', () => {
 
     const result = await service.convertToServiceOrder('budget-1');
 
-    expect(result.id).toBe('os-1');
+    expect(result).toEqual({
+      id: 'budget-1',
+      convertedToServiceOrder: true,
+      serviceOrder: {
+        id: 'os-1',
+        orderNumber: 'OS-1',
+        status: 'ABERTA',
+      },
+    });
     expect(prismaMock.serviceOrder.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({

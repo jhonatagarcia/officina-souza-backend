@@ -25,7 +25,7 @@ export class ClientsService {
       });
 
       if (existing) {
-        throw new ConflictException('Client with this CPF/CNPJ already exists');
+        throw new ConflictException('Ja existe um cliente com este CPF/CNPJ');
       }
     }
 
@@ -80,7 +80,7 @@ export class ClientsService {
     });
 
     if (!client) {
-      throw new NotFoundException('Client not found');
+      throw new NotFoundException('Cliente nao encontrado');
     }
 
     return toClientDetailResponseDto(client);
@@ -98,7 +98,7 @@ export class ClientsService {
       });
 
       if (existing) {
-        throw new ConflictException('Client with this CPF/CNPJ already exists');
+        throw new ConflictException('Ja existe um cliente com este CPF/CNPJ');
       }
     }
 
@@ -127,7 +127,7 @@ export class ClientsService {
     });
 
     if (!client) {
-      throw new NotFoundException('Client not found');
+      throw new NotFoundException('Cliente nao encontrado');
     }
 
     return client;

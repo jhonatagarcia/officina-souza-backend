@@ -38,7 +38,9 @@ export class VehiclesService {
     return toVehicleResponseDto(vehicle);
   }
 
-  async findAll(pagination: PaginationQueryDto): Promise<PaginatedResponse<VehicleDetailResponseDto>> {
+  async findAll(
+    pagination: PaginationQueryDto,
+  ): Promise<PaginatedResponse<VehicleDetailResponseDto>> {
     const where: Prisma.VehicleWhereInput = pagination.search
       ? {
           OR: [
@@ -82,7 +84,7 @@ export class VehiclesService {
     });
 
     if (!vehicle) {
-      throw new NotFoundException('Vehicle not found');
+      throw new NotFoundException('Veiculo nao encontrado');
     }
 
     return toVehicleDetailResponseDto(vehicle);
@@ -125,7 +127,7 @@ export class VehiclesService {
     });
 
     if (!vehicle) {
-      throw new NotFoundException('Vehicle not found');
+      throw new NotFoundException('Veiculo nao encontrado');
     }
 
     return vehicle;
@@ -140,7 +142,7 @@ export class VehiclesService {
     });
 
     if (existing) {
-      throw new ConflictException('Vehicle plate already exists');
+      throw new ConflictException('Ja existe um veiculo com esta placa');
     }
   }
 }

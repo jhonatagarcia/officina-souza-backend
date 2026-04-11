@@ -19,7 +19,7 @@ export class UpdateBudgetUseCase {
     const budget = await this.budgetReader.ensureExists(id);
 
     if (budget.status !== BudgetStatus.PENDENTE) {
-      throw new BadRequestException('Only pending budgets can be updated');
+      throw new BadRequestException('Apenas orcamentos pendentes podem ser atualizados');
     }
 
     if (updateBudgetDto.clientId || updateBudgetDto.vehicleId) {
@@ -30,7 +30,10 @@ export class UpdateBudgetUseCase {
     }
 
     const totals = updateBudgetDto.items
-      ? this.totalsService.calculate(updateBudgetDto.items, updateBudgetDto.discount ?? Number(budget.discount))
+      ? this.totalsService.calculate(
+          updateBudgetDto.items,
+          updateBudgetDto.discount ?? Number(budget.discount),
+        )
       : undefined;
 
     return this.prisma.$transaction(async (tx) => {

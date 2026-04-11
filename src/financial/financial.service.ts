@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { FinancialStatus, Prisma } from '@prisma/client';
+import { FinancialEntryType, FinancialStatus, Prisma } from '@prisma/client';
 import { ClientsService } from 'src/clients/clients.service';
 import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
 import { buildPaginationMeta, PaginatedResponse } from 'src/common/utils/pagination.util';
@@ -23,7 +23,9 @@ export class FinancialService {
     private readonly serviceOrdersService: ServiceOrdersService,
   ) {}
 
-  async create(createFinancialEntryDto: CreateFinancialEntryDto): Promise<FinancialEntryResponseDto> {
+  async create(
+    createFinancialEntryDto: CreateFinancialEntryDto,
+  ): Promise<FinancialEntryResponseDto> {
     await this.validateReferences(
       createFinancialEntryDto.clientId,
       createFinancialEntryDto.serviceOrderId,
@@ -49,14 +51,20 @@ export class FinancialService {
   async findAll(
     pagination: PaginationQueryDto,
   ): Promise<PaginatedResponse<FinancialEntryResponseDto>> {
-    const where: Prisma.FinancialEntryWhereInput = pagination.search
-      ? {
-          OR: [
-            { description: { contains: pagination.search, mode: 'insensitive' } },
-            { category: { contains: pagination.search, mode: 'insensitive' } },
-          ],
-        }
-      : {};
+    await this.syncOverdueStatuses();
+
+    const where: Prisma.FinancialEntryWhereInput = {
+      ...(pagination.search
+        ? {
+            OR: [
+              { description: { contains: pagination.search, mode: 'insensitive' } },
+              { category: { contains: pagination.search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+      ...(pagination.status ? { status: pagination.status as FinancialStatus } : {}),
+      ...(pagination.type ? { type: pagination.type as FinancialEntryType } : {}),
+    };
 
     const sortBy = FINANCIAL_ORDERABLE_FIELDS.has(pagination.sortBy ?? '')
       ? (pagination.sortBy ?? 'createdAt')
@@ -83,13 +91,15 @@ export class FinancialService {
   }
 
   async findOne(id: string): Promise<FinancialEntryResponseDto> {
+    await this.syncOverdueStatuses();
+
     const entry = await this.prisma.financialEntry.findUnique({
       where: { id },
       include: { client: true, serviceOrder: true },
     });
 
     if (!entry) {
-      throw new NotFoundException('Financial entry not found');
+      throw new NotFoundException('Lancamento financeiro nao encontrado');
     }
 
     return toFinancialEntryResponseDto(entry);
@@ -99,17 +109,19 @@ export class FinancialService {
     id: string,
     updateFinancialEntryDto: UpdateFinancialEntryDto,
   ): Promise<FinancialEntryResponseDto> {
+    await this.syncOverdueStatuses();
+
     const entry = await this.prisma.financialEntry.findUnique({
       where: { id },
       include: { client: true, serviceOrder: true },
     });
 
     if (!entry) {
-      throw new NotFoundException('Financial entry not found');
+      throw new NotFoundException('Lancamento financeiro nao encontrado');
     }
 
     if (entry.status === FinancialStatus.PAGO) {
-      throw new BadRequestException('Paid financial entries cannot be updated');
+      throw new BadRequestException('Lancamentos financeiros pagos nao podem ser atualizados');
     }
 
     await this.validateReferences(
@@ -124,6 +136,9 @@ export class FinancialService {
         dueDate: updateFinancialEntryDto.dueDate
           ? new Date(updateFinancialEntryDto.dueDate)
           : undefined,
+        status:
+          updateFinancialEntryDto.status ??
+          this.resolveOpenStatus(updateFinancialEntryDto.dueDate, entry.dueDate),
       },
       include: { client: true, serviceOrder: true },
     });
@@ -131,18 +146,23 @@ export class FinancialService {
     return toFinancialEntryResponseDto(updated);
   }
 
-  async pay(id: string, payFinancialEntryDto: PayFinancialEntryDto): Promise<FinancialEntryResponseDto> {
+  async pay(
+    id: string,
+    payFinancialEntryDto: PayFinancialEntryDto,
+  ): Promise<FinancialEntryResponseDto> {
+    await this.syncOverdueStatuses();
+
     const entry = await this.prisma.financialEntry.findUnique({
       where: { id },
       include: { client: true, serviceOrder: true },
     });
 
     if (!entry) {
-      throw new NotFoundException('Financial entry not found');
+      throw new NotFoundException('Lancamento financeiro nao encontrado');
     }
 
     if (entry.status === FinancialStatus.PAGO) {
-      throw new BadRequestException('Financial entry is already paid');
+      throw new BadRequestException('O lancamento financeiro ja foi pago');
     }
 
     const paidAt = new Date(payFinancialEntryDto.paidAt);
@@ -170,8 +190,30 @@ export class FinancialService {
 
     if (client && serviceOrder && serviceOrder.clientId !== client.id) {
       throw new BadRequestException(
-        'Financial entry client must match the linked service order client',
+        'O cliente do lancamento financeiro deve ser o mesmo da ordem de servico vinculada',
       );
     }
+  }
+
+  private resolveOpenStatus(dueDateValue?: string, fallbackDueDate?: Date) {
+    const dueDate = dueDateValue ? new Date(dueDateValue) : fallbackDueDate;
+
+    if (!dueDate) {
+      return undefined;
+    }
+
+    return dueDate < new Date() ? FinancialStatus.VENCIDO : FinancialStatus.PENDENTE;
+  }
+
+  private async syncOverdueStatuses() {
+    await this.prisma.financialEntry.updateMany({
+      where: {
+        status: FinancialStatus.PENDENTE,
+        dueDate: { lt: new Date() },
+      },
+      data: {
+        status: FinancialStatus.VENCIDO,
+      },
+    });
   }
 }

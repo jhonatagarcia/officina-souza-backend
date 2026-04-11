@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, ServiceOrderStatus } from '@prisma/client';
+import { FinancialEntryType, FinancialStatus, Prisma, ServiceOrderStatus } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { UpdateServiceOrderStatusDto } from 'src/service-orders/dto/update-service-order-status.dto';
 
@@ -13,7 +13,7 @@ export class UpdateServiceOrderStatusUseCase {
     });
 
     if (!serviceOrder) {
-      throw new NotFoundException('Service order not found');
+      throw new NotFoundException('Ordem de servico nao encontrada');
     }
 
     this.assertStatusTransition(serviceOrder.status, updateStatusDto.status);
@@ -40,6 +40,10 @@ export class UpdateServiceOrderStatusUseCase {
         await this.registerHistory(updated.id, tx);
       }
 
+      if (updateStatusDto.status === ServiceOrderStatus.ENTREGUE) {
+        await this.createReceivableEntry(updated.id, tx);
+      }
+
       return updated;
     });
   }
@@ -63,14 +67,14 @@ export class UpdateServiceOrderStatusUseCase {
     };
 
     if (!transitions[currentStatus].includes(nextStatus)) {
-      throw new BadRequestException('Invalid service order status transition');
+      throw new BadRequestException('Transicao de status da ordem de servico invalida');
     }
 
     if (
       nextStatus === ServiceOrderStatus.ENTREGUE &&
       currentStatus !== ServiceOrderStatus.FINALIZADA
     ) {
-      throw new BadRequestException('Service order can only be delivered after finalization');
+      throw new BadRequestException('A ordem de servico so pode ser entregue apos a finalizacao');
     }
   }
 
@@ -87,7 +91,7 @@ export class UpdateServiceOrderStatusUseCase {
     });
 
     if (!serviceOrder) {
-      throw new NotFoundException('Service order not found');
+      throw new NotFoundException('Ordem de servico nao encontrada');
     }
 
     const partsSummary = serviceOrder.parts
@@ -122,6 +126,47 @@ export class UpdateServiceOrderStatusUseCase {
         servicesSummary: serviceOrder.servicesPerformed ?? serviceOrder.problemDescription,
         partsSummary: partsSummary || null,
         totalAmount: serviceOrder.budget?.total ?? null,
+      },
+    });
+  }
+
+  private async createReceivableEntry(serviceOrderId: string, tx: Prisma.TransactionClient) {
+    const serviceOrder = await tx.serviceOrder.findUnique({
+      where: { id: serviceOrderId },
+      include: {
+        budget: true,
+        financialEntries: {
+          where: { type: FinancialEntryType.RECEIVABLE },
+          select: { id: true },
+          take: 1,
+        },
+      },
+    });
+
+    if (!serviceOrder) {
+      throw new NotFoundException('Ordem de servico nao encontrada');
+    }
+
+    if (serviceOrder.financialEntries.length > 0) {
+      return;
+    }
+
+    const amount = serviceOrder.budget?.total;
+
+    if (!amount || amount.lte(0)) {
+      return;
+    }
+
+    await tx.financialEntry.create({
+      data: {
+        type: FinancialEntryType.RECEIVABLE,
+        description: `Cobranca da ${serviceOrder.orderNumber}`,
+        category: 'Ordem de Servico',
+        amount,
+        dueDate: serviceOrder.deliveredAt ?? new Date(),
+        status: FinancialStatus.PENDENTE,
+        clientId: serviceOrder.clientId,
+        serviceOrderId: serviceOrder.id,
       },
     });
   }

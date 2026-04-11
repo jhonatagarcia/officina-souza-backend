@@ -22,10 +22,16 @@ export class InventoryService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(createInventoryItemDto: CreateInventoryItemDto): Promise<InventoryItemResponseDto> {
-    await this.ensureUniqueCode(createInventoryItemDto.internalCode);
+    const internalCode =
+      createInventoryItemDto.internalCode ?? (await this.generateInternalCode());
+
+    await this.ensureUniqueCode(internalCode);
 
     const item = await this.prisma.inventoryItem.create({
-      data: createInventoryItemDto,
+      data: {
+        ...createInventoryItemDto,
+        internalCode,
+      },
     });
 
     return toInventoryItemResponseDto(item);
@@ -70,7 +76,7 @@ export class InventoryService {
     });
 
     if (!item) {
-      throw new NotFoundException('Inventory item not found');
+      throw new NotFoundException('Item de estoque nao encontrado');
     }
 
     return toInventoryItemResponseDto(item);
@@ -110,7 +116,7 @@ export class InventoryService {
     tx: Prisma.TransactionClient,
   ) {
     if (quantity <= 0) {
-      throw new BadRequestException('Quantity must be greater than zero');
+      throw new BadRequestException('A quantidade deve ser maior que zero');
     }
 
     const result = await tx.inventoryItem.updateMany({
@@ -138,10 +144,10 @@ export class InventoryService {
     });
 
     if (!item) {
-      throw new NotFoundException('Inventory item not found');
+      throw new NotFoundException('Item de estoque nao encontrado');
     }
 
-    throw new BadRequestException('Insufficient inventory quantity');
+    throw new BadRequestException('Quantidade insuficiente em estoque');
   }
 
   private async ensureUniqueCode(code: string, excludeId?: string) {
@@ -153,7 +159,27 @@ export class InventoryService {
     });
 
     if (existing) {
-      throw new ConflictException('Inventory internal code already exists');
+      throw new ConflictException('Ja existe um item de estoque com este codigo interno');
     }
+  }
+
+  private async generateInternalCode() {
+    const lastGeneratedItem = await this.prisma.inventoryItem.findFirst({
+      where: {
+        internalCode: {
+          startsWith: 'PEC-',
+        },
+      },
+      orderBy: {
+        internalCode: 'desc',
+      },
+    });
+
+    const lastSequence = lastGeneratedItem
+      ? Number(lastGeneratedItem.internalCode.replace(/^PEC-/, ''))
+      : 0;
+    const nextSequence = Number.isFinite(lastSequence) ? lastSequence + 1 : 1;
+
+    return `PEC-${nextSequence.toString().padStart(6, '0')}`;
   }
 }

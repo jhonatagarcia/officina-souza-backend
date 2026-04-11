@@ -14,6 +14,9 @@ describe('FinancialService', () => {
       create: jest.fn(),
       findUnique: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
+      findMany: jest.fn(),
+      count: jest.fn(),
     },
     $transaction: jest.fn(),
   };
@@ -23,6 +26,7 @@ describe('FinancialService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    prismaMock.$transaction.mockResolvedValue([[], 0]);
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -112,6 +116,7 @@ describe('FinancialService', () => {
     prismaMock.financialEntry.findUnique.mockResolvedValue({
       id: 'fin-1',
       status: FinancialStatus.PENDENTE,
+      dueDate: new Date('2020-01-01T00:00:00.000Z'),
       clientId: null,
       serviceOrderId: null,
       client: null,
@@ -126,6 +131,68 @@ describe('FinancialService', () => {
         where: { id: 'fin-1' },
         data: expect.objectContaining({
           dueDate: new Date('2030-01-01T00:00:00.000Z'),
+          status: FinancialStatus.PENDENTE,
+        }),
+      }),
+    );
+  });
+
+  it('should apply financial filters when listing entries', async () => {
+    prismaMock.$transaction.mockResolvedValueOnce([[{ id: 'fin-1' }], 1]);
+
+    await service.findAll({
+      page: 1,
+      limit: 10,
+      search: 'OS',
+      status: 'PENDENTE',
+      type: 'RECEIVABLE',
+      sortOrder: 'desc',
+    });
+
+    expect(prismaMock.financialEntry.updateMany).toHaveBeenCalled();
+    expect(prismaMock.financialEntry.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          OR: [
+            { description: { contains: 'OS', mode: 'insensitive' } },
+            { category: { contains: 'OS', mode: 'insensitive' } },
+          ],
+          status: 'PENDENTE',
+          type: 'RECEIVABLE',
+        },
+      }),
+    );
+    expect(prismaMock.financialEntry.count).toHaveBeenCalledWith({
+      where: {
+        OR: [
+          { description: { contains: 'OS', mode: 'insensitive' } },
+          { category: { contains: 'OS', mode: 'insensitive' } },
+        ],
+        status: 'PENDENTE',
+        type: 'RECEIVABLE',
+      },
+    });
+  });
+
+  it('should recalculate status from due date on update when status is not explicit', async () => {
+    prismaMock.financialEntry.findUnique.mockResolvedValue({
+      id: 'fin-1',
+      status: FinancialStatus.VENCIDO,
+      dueDate: new Date('2020-01-01T00:00:00.000Z'),
+      clientId: null,
+      serviceOrderId: null,
+      client: null,
+      serviceOrder: null,
+    });
+    prismaMock.financialEntry.update.mockResolvedValue({ id: 'fin-1' });
+
+    await service.update('fin-1', { dueDate: '2030-01-01T00:00:00.000Z' });
+
+    expect(prismaMock.financialEntry.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          dueDate: new Date('2030-01-01T00:00:00.000Z'),
+          status: FinancialStatus.PENDENTE,
         }),
       }),
     );

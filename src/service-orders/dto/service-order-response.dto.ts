@@ -61,6 +61,10 @@ export interface ServiceOrderResponseDto {
 }
 
 export interface ServiceOrderDetailResponseDto extends ServiceOrderResponseDto {
+  partsTotal: Prisma.Decimal;
+  laborTotal: Prisma.Decimal;
+  discount: Prisma.Decimal;
+  total: Prisma.Decimal;
   client: ServiceOrderClientSummaryDto;
   vehicle: ServiceOrderVehicleSummaryDto;
   mechanic: ServiceOrderMechanicSummaryDto | null;
@@ -83,6 +87,11 @@ type ServiceOrderListModel = Prisma.ServiceOrderGetPayload<{
 }>;
 type ServiceOrderWithRelationsModel = Prisma.ServiceOrderGetPayload<{
   include: {
+    budget: {
+      include: {
+        items: true;
+      };
+    };
     client: true;
     vehicle: true;
     mechanic: true;
@@ -139,8 +148,25 @@ export function toServiceOrderPartResponseDto(
 export function toServiceOrderDetailResponseDto(
   serviceOrder: ServiceOrderWithRelationsModel,
 ): ServiceOrderDetailResponseDto {
+  const partsTotal = serviceOrder.budget
+    ? serviceOrder.budget.items
+        .filter((item) => item.type === 'PART')
+        .reduce((acc, item) => acc.plus(item.totalPrice), new Prisma.Decimal(0))
+    : serviceOrder.parts.reduce((acc, part) => acc.plus(part.totalPrice), new Prisma.Decimal(0));
+  const laborTotal = serviceOrder.budget
+    ? serviceOrder.budget.items
+        .filter((item) => item.type === 'LABOR')
+        .reduce((acc, item) => acc.plus(item.totalPrice), new Prisma.Decimal(0))
+    : new Prisma.Decimal(0);
+  const discount = serviceOrder.budget?.discount ?? new Prisma.Decimal(0);
+  const total = serviceOrder.budget?.total ?? partsTotal.plus(laborTotal).minus(discount);
+
   return {
     ...toServiceOrderResponseDto(serviceOrder),
+    partsTotal,
+    laborTotal,
+    discount,
+    total,
     client: {
       id: serviceOrder.client.id,
       name: serviceOrder.client.name,

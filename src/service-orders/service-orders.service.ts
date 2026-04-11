@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, ServiceOrderStatus } from '@prisma/client';
 import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
 import { buildPaginationMeta, PaginatedResponse } from 'src/common/utils/pagination.util';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -49,16 +49,21 @@ export class ServiceOrdersService {
   async findAll(
     pagination: PaginationQueryDto,
   ): Promise<PaginatedResponse<ServiceOrderListResponseDto>> {
-    const where: Prisma.ServiceOrderWhereInput = pagination.search
-      ? {
-          OR: [
-            { orderNumber: { contains: pagination.search, mode: 'insensitive' } },
-            { problemDescription: { contains: pagination.search, mode: 'insensitive' } },
-            { client: { name: { contains: pagination.search, mode: 'insensitive' } } },
-            { vehicle: { plate: { contains: pagination.search, mode: 'insensitive' } } },
-          ],
-        }
-      : {};
+    const where: Prisma.ServiceOrderWhereInput = {
+      ...(pagination.search
+        ? {
+            OR: [
+              { orderNumber: { contains: pagination.search, mode: 'insensitive' } },
+              { problemDescription: { contains: pagination.search, mode: 'insensitive' } },
+              { client: { name: { contains: pagination.search, mode: 'insensitive' } } },
+              { vehicle: { plate: { contains: pagination.search, mode: 'insensitive' } } },
+            ],
+          }
+        : {}),
+      ...(pagination.status
+        ? { status: pagination.status as ServiceOrderStatus }
+        : {}),
+    };
 
     const sortBy = SERVICE_ORDER_ORDERABLE_FIELDS.has(pagination.sortBy ?? '')
       ? (pagination.sortBy ?? 'createdAt')
@@ -89,6 +94,11 @@ export class ServiceOrdersService {
     const serviceOrder = await this.prisma.serviceOrder.findUnique({
       where: { id },
       include: {
+        budget: {
+          include: {
+            items: true,
+          },
+        },
         client: true,
         vehicle: true,
         mechanic: true,
@@ -99,7 +109,7 @@ export class ServiceOrdersService {
     });
 
     if (!serviceOrder) {
-      throw new NotFoundException('Service order not found');
+      throw new NotFoundException('Ordem de servico nao encontrada');
     }
 
     return toServiceOrderDetailResponseDto(serviceOrder);
@@ -179,7 +189,7 @@ export class ServiceOrdersService {
     });
 
     if (!serviceOrder) {
-      throw new NotFoundException('Service order not found');
+      throw new NotFoundException('Ordem de servico nao encontrada');
     }
 
     return serviceOrder;

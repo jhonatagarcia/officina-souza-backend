@@ -16,7 +16,7 @@ export class AddServiceOrderPartUseCase {
     });
 
     if (!serviceOrder) {
-      throw new NotFoundException('Service order not found');
+      throw new NotFoundException('Ordem de servico nao encontrada');
     }
 
     return this.prisma.$transaction(async (tx) => {

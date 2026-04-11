@@ -8,6 +8,7 @@ import { BudgetConversionsService } from 'src/budget-conversions/budget-conversi
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { BudgetsService } from 'src/budgets/budgets.service';
 import { ClientsService } from 'src/clients/clients.service';
+import { DashboardService } from 'src/dashboard/dashboard.service';
 import { FinancialService } from 'src/financial/financial.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ServiceOrdersService } from 'src/service-orders/service-orders.service';
@@ -118,7 +119,11 @@ describe('AppController (e2e)', () => {
       })
       .overrideProvider(BudgetConversionsService)
       .useValue({
-        convertToServiceOrder: jest.fn().mockResolvedValue({ id: 'os-1', orderNumber: 'OS-1' }),
+        convertToServiceOrder: jest.fn().mockResolvedValue({
+          id: 'budget-1',
+          convertedToServiceOrder: true,
+          serviceOrder: { id: 'os-1', orderNumber: 'OS-1', status: 'ABERTA' },
+        }),
       })
       .overrideProvider(ServiceOrdersService)
       .useValue({
@@ -138,6 +143,15 @@ describe('AppController (e2e)', () => {
         findOne: jest.fn(),
         update: jest.fn(),
         pay: jest.fn().mockResolvedValue({ id: 'fin-1', status: 'PAGO' }),
+      })
+      .overrideProvider(DashboardService)
+      .useValue({
+        getSummary: jest.fn().mockResolvedValue({
+          serviceOrders: { open: 0, inProgress: 0, readyForDelivery: 0 },
+          budgets: { pending: 0 },
+          financial: { monthRevenue: 0 },
+          inventory: { lowStockCount: 0, lowStockItems: [] },
+        }),
       })
       .overrideProvider(PrismaService)
       .useValue({
@@ -291,7 +305,19 @@ describe('AppController (e2e)', () => {
       .set('Authorization', 'Bearer token')
       .expect(201)
       .expect(({ body }) => {
-        expect(body.id).toBe('os-1');
+        expect(body.id).toBe('budget-1');
+        expect(body.serviceOrder.id).toBe('os-1');
+      });
+  });
+
+  it('/api/v1/dashboard/summary (GET)', async () => {
+    await request(app.getHttpServer())
+      .get('/api/v1/dashboard/summary')
+      .set('Authorization', 'Bearer token')
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.serviceOrders.open).toBe(0);
+        expect(body.inventory.lowStockItems).toEqual([]);
       });
   });
 

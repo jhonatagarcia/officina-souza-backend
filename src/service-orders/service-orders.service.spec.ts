@@ -1,6 +1,6 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { ServiceOrderStatus } from '@prisma/client';
+import { Prisma, ServiceOrderStatus } from '@prisma/client';
 import { ClientsService } from 'src/clients/clients.service';
 import { InventoryService } from 'src/inventory/inventory.service';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -20,6 +20,9 @@ describe('ServiceOrdersService', () => {
       create: jest.fn(),
       findUnique: jest.fn(),
       update: jest.fn(),
+    },
+    financialEntry: {
+      create: jest.fn(),
     },
     serviceOrderPart: {
       findFirst: jest.fn(),
@@ -135,6 +138,115 @@ describe('ServiceOrdersService', () => {
 
     expect(prismaMock.vehicleHistory.update).toHaveBeenCalled();
     expect(prismaMock.vehicleHistory.create).not.toHaveBeenCalled();
+  });
+
+  it('should create receivable entry when service order is delivered with budget total', async () => {
+    const deliveredAt = new Date('2030-01-01T12:00:00.000Z');
+
+    prismaMock.serviceOrder.findUnique
+      .mockResolvedValueOnce({
+        id: 'os-1',
+        status: ServiceOrderStatus.FINALIZADA,
+      })
+      .mockResolvedValueOnce({
+        id: 'os-1',
+        orderNumber: 'OS-123',
+        clientId: 'client-1',
+        deliveredAt,
+        budget: { total: { lte: () => false } },
+        financialEntries: [],
+      });
+    prismaMock.serviceOrder.update.mockResolvedValue({
+      id: 'os-1',
+      status: ServiceOrderStatus.ENTREGUE,
+      deliveredAt,
+    });
+    prismaMock.financialEntry.create.mockResolvedValue({ id: 'fin-1' });
+
+    const result = await service.updateStatus('os-1', {
+      status: ServiceOrderStatus.ENTREGUE,
+    });
+
+    expect(result.status).toBe(ServiceOrderStatus.ENTREGUE);
+    expect(prismaMock.financialEntry.create).toHaveBeenCalledWith({
+      data: {
+        type: 'RECEIVABLE',
+        description: 'Cobranca da OS-123',
+        category: 'Ordem de Servico',
+        amount: expect.any(Object),
+        dueDate: deliveredAt,
+        status: 'PENDENTE',
+        clientId: 'client-1',
+        serviceOrderId: 'os-1',
+      },
+    });
+  });
+
+  it('should not create duplicate receivable entry when service order already has one', async () => {
+    prismaMock.serviceOrder.findUnique
+      .mockResolvedValueOnce({
+        id: 'os-1',
+        status: ServiceOrderStatus.FINALIZADA,
+      })
+      .mockResolvedValueOnce({
+        id: 'os-1',
+        orderNumber: 'OS-123',
+        clientId: 'client-1',
+        deliveredAt: new Date('2030-01-01T12:00:00.000Z'),
+        budget: { total: { lte: () => false } },
+        financialEntries: [{ id: 'fin-1' }],
+      });
+    prismaMock.serviceOrder.update.mockResolvedValue({
+      id: 'os-1',
+      status: ServiceOrderStatus.ENTREGUE,
+      deliveredAt: new Date('2030-01-01T12:00:00.000Z'),
+    });
+
+    await service.updateStatus('os-1', { status: ServiceOrderStatus.ENTREGUE });
+
+    expect(prismaMock.financialEntry.create).not.toHaveBeenCalled();
+  });
+
+  it('should return official totals from budget when fetching service order detail', async () => {
+    prismaMock.serviceOrder.findUnique.mockResolvedValue({
+      id: 'os-1',
+      orderNumber: 'OS-123',
+      budgetId: 'budget-1',
+      clientId: 'client-1',
+      vehicleId: 'vehicle-1',
+      mechanicId: null,
+      problemDescription: 'Falha no freio',
+      diagnosis: null,
+      servicesPerformed: null,
+      vehicleChecklist: null,
+      openedAt: new Date('2030-01-01T00:00:00.000Z'),
+      expectedDeliveryAt: null,
+      finishedAt: null,
+      deliveredAt: null,
+      status: ServiceOrderStatus.ABERTA,
+      notes: null,
+      createdAt: new Date('2030-01-01T00:00:00.000Z'),
+      updatedAt: new Date('2030-01-01T00:00:00.000Z'),
+      budget: {
+        discount: new Prisma.Decimal(10),
+        total: new Prisma.Decimal(140),
+        items: [
+          { type: 'PART', totalPrice: new Prisma.Decimal(40) },
+          { type: 'LABOR', totalPrice: new Prisma.Decimal(110) },
+        ],
+      },
+      client: { id: 'client-1', name: 'Cliente', document: null },
+      vehicle: { id: 'vehicle-1', plate: 'ABC1234', brand: 'Ford', model: 'Ka', year: 2020 },
+      mechanic: null,
+      parts: [],
+    });
+
+    const result = await service.findOne('os-1');
+
+    expect(result.partsTotal.toNumber()).toBe(40);
+    expect(result.laborTotal.toNumber()).toBe(110);
+    expect(result.discount.toNumber()).toBe(10);
+    expect(result.total.toNumber()).toBe(140);
   });
 
   it('should consolidate part quantities when the same inventory item is added again', async () => {

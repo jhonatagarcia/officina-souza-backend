@@ -41,17 +41,22 @@ export class BudgetsService {
     return toBudgetResponseDto(budget);
   }
 
-  async findAll(pagination: PaginationQueryDto): Promise<PaginatedResponse<BudgetDetailResponseDto>> {
-    const where: Prisma.BudgetWhereInput = pagination.search
-      ? {
-          OR: [
-            { code: { contains: pagination.search, mode: 'insensitive' } },
-            { problemDescription: { contains: pagination.search, mode: 'insensitive' } },
-            { client: { name: { contains: pagination.search, mode: 'insensitive' } } },
-            { vehicle: { plate: { contains: pagination.search, mode: 'insensitive' } } },
-          ],
-        }
-      : {};
+  async findAll(
+    pagination: PaginationQueryDto,
+  ): Promise<PaginatedResponse<BudgetDetailResponseDto>> {
+    const where: Prisma.BudgetWhereInput = {
+      ...(pagination.search
+        ? {
+            OR: [
+              { code: { contains: pagination.search, mode: 'insensitive' } },
+              { problemDescription: { contains: pagination.search, mode: 'insensitive' } },
+              { client: { name: { contains: pagination.search, mode: 'insensitive' } } },
+              { vehicle: { plate: { contains: pagination.search, mode: 'insensitive' } } },
+            ],
+          }
+        : {}),
+      ...(pagination.status ? { status: pagination.status as BudgetStatus } : {}),
+    };
 
     const sortBy = BUDGET_ORDERABLE_FIELDS.has(pagination.sortBy ?? '')
       ? (pagination.sortBy ?? 'createdAt')
@@ -81,7 +86,7 @@ export class BudgetsService {
     });
 
     if (!budget) {
-      throw new NotFoundException('Budget not found');
+      throw new NotFoundException('Orcamento nao encontrado');
     }
 
     return toBudgetDetailResponseDto(budget);
@@ -119,15 +124,15 @@ export class BudgetsService {
     });
 
     if (!budget) {
-      throw new NotFoundException('Budget not found');
+      throw new NotFoundException('Orcamento nao encontrado');
     }
 
     if (budget.status !== BudgetStatus.APROVADO) {
-      throw new BadRequestException('Only approved budgets can be converted');
+      throw new BadRequestException('Apenas orcamentos aprovados podem ser convertidos');
     }
 
     if (budget.convertedToServiceOrder || budget.serviceOrder) {
-      throw new ConflictException('Budget already converted to service order');
+      throw new ConflictException('O orcamento ja foi convertido em ordem de servico');
     }
 
     return budget;

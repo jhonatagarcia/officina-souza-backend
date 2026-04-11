@@ -1,10 +1,11 @@
-import { ValidationPipe, VersioningType } from '@nestjs/common';
+import { BadRequestException, ValidationPipe, VersioningType } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from 'src/app.module';
+import { formatValidationMessages } from 'src/common/utils/validation-messages.util';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 async function bootstrap(): Promise<void> {
@@ -30,6 +31,7 @@ async function bootstrap(): Promise<void> {
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
+      exceptionFactory: (errors) => new BadRequestException(formatValidationMessages(errors)),
       transformOptions: { enableImplicitConversion: true },
       validationError: {
         target: false,

@@ -23,7 +23,7 @@ export class UsersService {
     });
 
     if (existing) {
-      throw new ConflictException('User already exists');
+      throw new ConflictException('Usuario ja existe');
     }
 
     const passwordHash = await bcrypt.hash(
@@ -55,7 +55,7 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException('Usuario nao encontrado');
     }
 
     return this.sanitizeUser(user);
@@ -65,13 +65,13 @@ export class UsersService {
     const user = await this.findByEmail(email);
 
     if (!user || !user.isActive) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('Credenciais invalidas');
     }
 
     const passwordMatches = await bcrypt.compare(password, user.passwordHash);
 
     if (!passwordMatches) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('Credenciais invalidas');
     }
 
     await this.prisma.user.update({

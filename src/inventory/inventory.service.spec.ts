@@ -44,6 +44,31 @@ describe('InventoryService', () => {
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
+  it('should generate internal code automatically when none is provided', async () => {
+    prismaMock.inventoryItem.findFirst
+      .mockResolvedValueOnce({ internalCode: 'PEC-000123' })
+      .mockResolvedValueOnce(null);
+    prismaMock.inventoryItem.create.mockResolvedValue({
+      id: 'item-1',
+      name: 'Filtro de óleo',
+      internalCode: 'PEC-000124',
+    });
+
+    await service.create({
+      name: 'Filtro de óleo',
+      quantity: 10,
+      minimumQuantity: 2,
+      cost: 10,
+      salePrice: 20,
+    });
+
+    expect(prismaMock.inventoryItem.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        internalCode: 'PEC-000124',
+      }),
+    });
+  });
+
   it('should return only low stock items', async () => {
     prismaMock.inventoryItem.findMany.mockResolvedValue([
       { id: '1', quantity: 1, minimumQuantity: 2 },

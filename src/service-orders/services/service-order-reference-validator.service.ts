@@ -18,7 +18,7 @@ export class ServiceOrderReferenceValidatorService {
     ]);
 
     if (vehicle.clientId !== client.id) {
-      throw new BadRequestException('Vehicle does not belong to the informed client');
+      throw new BadRequestException('O veiculo nao pertence ao cliente informado');
     }
 
     if (mechanicId) {

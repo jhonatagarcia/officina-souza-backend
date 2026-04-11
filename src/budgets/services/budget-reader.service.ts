@@ -12,7 +12,7 @@ export class BudgetReaderService {
     });
 
     if (!budget) {
-      throw new NotFoundException('Budget not found');
+      throw new NotFoundException('Orcamento nao encontrado');
     }
 
     return budget;

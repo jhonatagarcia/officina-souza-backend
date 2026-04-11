@@ -9,6 +9,7 @@ import {
   validateSync,
 } from 'class-validator';
 import { plainToInstance, Transform } from 'class-transformer';
+import { formatValidationMessages } from 'src/common/utils/validation-messages.util';
 
 class EnvironmentVariables {
   @IsIn(['development', 'test', 'production'])
@@ -91,7 +92,9 @@ export function validateEnv(config: Record<string, unknown>): EnvironmentVariabl
   });
 
   if (errors.length > 0) {
-    throw new Error(`Environment validation failed: ${errors.toString()}`);
+    throw new Error(
+      `Falha na validacao do ambiente: ${formatValidationMessages(errors).join(', ')}`,
+    );
   }
 
   return validatedConfig;

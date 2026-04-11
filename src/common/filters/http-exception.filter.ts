@@ -18,8 +18,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     const message =
       typeof exceptionResponse === 'object' && exceptionResponse !== null
-        ? ((exceptionResponse as Record<string, unknown>).message ?? 'Unexpected error')
-        : (exceptionResponse ?? 'Unexpected error');
+        ? ((exceptionResponse as Record<string, unknown>).message ?? 'Erro inesperado')
+        : (exceptionResponse ?? 'Erro inesperado');
 
     if (status >= 500) {
       this.logger.error(
