@@ -14,6 +14,7 @@ import { DashboardModule } from 'src/dashboard/dashboard.module';
 import { FinancialModule } from 'src/financial/financial.module';
 import { InventoryModule } from 'src/inventory/inventory.module';
 import { PrismaModule } from 'src/prisma/prisma.module';
+import { ServiceCatalogModule } from 'src/service-catalog/service-catalog.module';
 import { ServiceOrdersModule } from 'src/service-orders/service-orders.module';
 import { UsersModule } from 'src/users/users.module';
 import { VehiclesModule } from 'src/vehicles/vehicles.module';
@@ -55,6 +56,7 @@ import { HealthModule } from 'src/health/health.module';
     VehiclesModule,
     BudgetsModule,
     BudgetConversionsModule,
+    ServiceCatalogModule,
     ServiceOrdersModule,
     InventoryModule,
     FinancialModule,

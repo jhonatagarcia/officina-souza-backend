@@ -44,10 +44,5 @@ export class CreateVehicleDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  chassis?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
   notes?: string;
 }

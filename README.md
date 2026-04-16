@@ -28,7 +28,7 @@ Entidades principais:
 Regras principais implementadas:
 
 - CPF/CNPJ único quando informado.
-- Placa única por veículo.
+- Placa única por veículo e usada como identificação única do carro.
 - Veículo sempre vinculado ao cliente correto também no banco, via FK composta.
 - Orçamento com ao menos um item.
 - Conversão para OS apenas com orçamento aprovado.

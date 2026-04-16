@@ -18,7 +18,6 @@ export interface VehicleResponseDto {
   color: string | null;
   mileage: number | null;
   fuel: string | null;
-  chassis: string | null;
   notes: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -58,7 +57,6 @@ export function toVehicleResponseDto(vehicle: VehicleModel): VehicleResponseDto 
     color: vehicle.color,
     mileage: vehicle.mileage,
     fuel: vehicle.fuel,
-    chassis: vehicle.chassis,
     notes: vehicle.notes,
     createdAt: vehicle.createdAt,
     updatedAt: vehicle.updatedAt,

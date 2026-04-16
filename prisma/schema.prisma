@@ -53,6 +53,19 @@ enum PaymentMethod {
   OUTRO
 }
 
+enum ServiceBillingType {
+  LABOR_ONLY
+  PARTS_AND_LABOR
+  FIXED_PRICE
+}
+
+enum ServiceMaterialSource {
+  SHOP_SUPPLIES
+  CUSTOMER_SUPPLIES
+  NO_PARTS_REQUIRED
+  FLEXIBLE
+}
+
 model User {
   id             String         @id @default(uuid()) @db.Uuid
   name           String
@@ -99,7 +112,6 @@ model Vehicle {
   color             String?
   mileage           Int?
   fuel              String?
-  chassis           String?
   notes             String?
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
@@ -212,6 +224,31 @@ model InventoryItem {
   @@index([name])
   @@index([internalCode])
   @@index([category, name])
+}
+
+model ServiceCatalogItem {
+  id                  String                @id @default(uuid()) @db.Uuid
+  code                String                @unique
+  name                String
+  category            String
+  description         String?
+  internalNotes       String?
+  laborPrice          Decimal               @db.Decimal(12, 2)
+  productPrice        Decimal               @db.Decimal(12, 2)
+  suggestedTotalPrice Decimal               @db.Decimal(12, 2)
+  billingType         ServiceBillingType
+  materialSource      ServiceMaterialSource
+  warrantyDays        Int?
+  active              Boolean               @default(true)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  @@index([category])
+  @@index([name])
+  @@index([active])
+  @@index([createdAt])
+  @@index([active, category, name])
+  @@index([active, createdAt])
 }
 
 model ServiceOrderPart {
