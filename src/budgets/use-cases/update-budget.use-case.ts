@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { BudgetStatus } from '@prisma/client';
+import { BudgetItemType, BudgetStatus } from '@prisma/client';
 import { UpdateBudgetDto } from 'src/budgets/dto/update-budget.dto';
 import { BudgetReaderService } from 'src/budgets/services/budget-reader.service';
 import { BudgetReferenceValidatorService } from 'src/budgets/services/budget-reference-validator.service';
@@ -35,6 +35,9 @@ export class UpdateBudgetUseCase {
           updateBudgetDto.discount ?? Number(budget.discount),
         )
       : undefined;
+    const serviceCatalogItems = updateBudgetDto.items
+      ? await this.loadServiceCatalogItems(updateBudgetDto.items)
+      : new Map<string, { id: string; code: string; active: boolean }>();
 
     return this.prisma.$transaction(async (tx) => {
       if (updateBudgetDto.items) {
@@ -55,6 +58,9 @@ export class UpdateBudgetUseCase {
             ? {
                 create: updateBudgetDto.items.map((item) => ({
                   ...item,
+                  serviceCode: item.serviceCatalogItemId
+                    ? serviceCatalogItems.get(item.serviceCatalogItemId)?.code
+                    : null,
                   totalPrice: item.quantity * item.unitPrice,
                 })),
               }
@@ -63,5 +69,39 @@ export class UpdateBudgetUseCase {
         include: { items: true },
       });
     });
+  }
+
+  private async loadServiceCatalogItems(items: NonNullable<UpdateBudgetDto['items']>) {
+    const serviceCatalogItemIds = [
+      ...new Set(
+        items
+          .map((item) => item.serviceCatalogItemId)
+          .filter((serviceCatalogItemId): serviceCatalogItemId is string => Boolean(serviceCatalogItemId)),
+      ),
+    ];
+
+    if (!serviceCatalogItemIds.length) {
+      return new Map<string, { id: string; code: string; active: boolean }>();
+    }
+
+    const serviceCatalogItems = await this.prisma.serviceCatalogItem.findMany({
+      where: { id: { in: serviceCatalogItemIds } },
+      select: { id: true, code: true, active: true },
+    });
+
+    const byId = new Map(serviceCatalogItems.map((item) => [item.id, item]));
+
+    items.forEach((item) => {
+      if (!item.serviceCatalogItemId) {
+        return;
+      }
+
+      const serviceCatalogItem = byId.get(item.serviceCatalogItemId);
+      if (!serviceCatalogItem || !serviceCatalogItem.active || item.type !== BudgetItemType.LABOR) {
+        throw new BadRequestException('Servico informado para o item do orcamento e invalido');
+      }
+    });
+
+    return byId;
   }
 }

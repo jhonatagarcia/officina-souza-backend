@@ -4,6 +4,8 @@ export interface BudgetItemResponseDto {
   id: string;
   budgetId: string;
   type: string;
+  serviceCatalogItemId: string | null;
+  serviceCode: string | null;
   description: string;
   quantity: number;
   unitPrice: Prisma.Decimal;
@@ -71,6 +73,8 @@ export function toBudgetItemResponseDto(item: BudgetItemModel): BudgetItemRespon
     id: item.id,
     budgetId: item.budgetId,
     type: item.type,
+    serviceCatalogItemId: item.serviceCatalogItemId,
+    serviceCode: item.serviceCode,
     description: item.description,
     quantity: item.quantity,
     unitPrice: item.unitPrice,

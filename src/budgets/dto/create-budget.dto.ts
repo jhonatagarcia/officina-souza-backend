@@ -8,6 +8,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -22,6 +23,11 @@ class CreateBudgetItemDto {
   @IsString()
   @IsNotEmpty()
   description!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  serviceCatalogItemId?: string;
 
   @ApiProperty()
   @IsNumber({ maxDecimalPlaces: 2 })

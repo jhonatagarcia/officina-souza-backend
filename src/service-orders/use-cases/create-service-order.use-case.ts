@@ -17,10 +17,11 @@ export class CreateServiceOrderUseCase {
       createServiceOrderDto.vehicleId,
       createServiceOrderDto.mechanicId,
     );
+    const orderNumber = await buildServiceOrderNumber(this.prisma);
 
     return this.prisma.serviceOrder.create({
       data: {
-        orderNumber: buildServiceOrderNumber(),
+        orderNumber,
         clientId: createServiceOrderDto.clientId,
         vehicleId: createServiceOrderDto.vehicleId,
         mechanicId: createServiceOrderDto.mechanicId,

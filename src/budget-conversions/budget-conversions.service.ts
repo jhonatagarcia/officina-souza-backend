@@ -14,10 +14,11 @@ export class BudgetConversionsService {
   async convertToServiceOrder(budgetId: string): Promise<ConvertBudgetResponseDto> {
     return this.prisma.$transaction(async (tx) => {
       const budget = await this.budgetsService.assertCanConvert(budgetId, tx);
+      const orderNumber = await buildServiceOrderNumber(tx);
 
       const serviceOrder = await tx.serviceOrder.create({
         data: {
-          orderNumber: buildServiceOrderNumber(),
+          orderNumber,
           budgetId: budget.id,
           clientId: budget.clientId,
           vehicleId: budget.vehicleId,

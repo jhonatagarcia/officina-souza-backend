@@ -4,6 +4,7 @@ export interface ServiceOrderClientSummaryDto {
   id: string;
   name: string;
   document: string | null;
+  phone: string | null;
 }
 
 export interface ServiceOrderVehicleSummaryDto {
@@ -39,6 +40,14 @@ export interface ServiceOrderPartResponseDto {
   inventoryItem: ServiceOrderPartInventorySummaryDto;
 }
 
+export interface ServiceOrderBudgetItemResponseDto {
+  id: string;
+  type: string;
+  serviceCode: string | null;
+  description: string;
+  quantity: number;
+}
+
 export interface ServiceOrderResponseDto {
   id: string;
   orderNumber: string;
@@ -65,6 +74,7 @@ export interface ServiceOrderDetailResponseDto extends ServiceOrderResponseDto {
   laborTotal: Prisma.Decimal;
   discount: Prisma.Decimal;
   total: Prisma.Decimal;
+  budgetItems: ServiceOrderBudgetItemResponseDto[];
   client: ServiceOrderClientSummaryDto;
   vehicle: ServiceOrderVehicleSummaryDto;
   mechanic: ServiceOrderMechanicSummaryDto | null;
@@ -167,10 +177,18 @@ export function toServiceOrderDetailResponseDto(
     laborTotal,
     discount,
     total,
+    budgetItems: (serviceOrder.budget?.items ?? []).map((item) => ({
+      id: item.id,
+      type: item.type,
+      serviceCode: item.serviceCode,
+      description: item.description,
+      quantity: item.quantity,
+    })),
     client: {
       id: serviceOrder.client.id,
       name: serviceOrder.client.name,
       document: serviceOrder.client.document,
+      phone: serviceOrder.client.phone,
     },
     vehicle: {
       id: serviceOrder.vehicle.id,
@@ -200,6 +218,7 @@ export function toServiceOrderListResponseDto(
       id: serviceOrder.client.id,
       name: serviceOrder.client.name,
       document: serviceOrder.client.document,
+      phone: serviceOrder.client.phone,
     },
     vehicle: {
       id: serviceOrder.vehicle.id,
