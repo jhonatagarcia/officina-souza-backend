@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDateString, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsDateString, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator';
 
 export class CreateServiceOrderDto {
   @ApiProperty()
@@ -37,8 +37,9 @@ export class CreateServiceOrderDto {
 
   @ApiPropertyOptional()
   @IsOptional()
+  @ValidateIf((_, value) => value !== null)
   @IsDateString()
-  expectedDeliveryAt?: string;
+  expectedDeliveryAt?: string | null;
 
   @ApiPropertyOptional()
   @IsOptional()

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, ServiceOrderStatus } from '@prisma/client';
 import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
 import { buildPaginationMeta, PaginatedResponse } from 'src/common/utils/pagination.util';
@@ -120,6 +120,16 @@ export class ServiceOrdersService {
     updateServiceOrderDto: UpdateServiceOrderDto,
   ): Promise<ServiceOrderResponseDto> {
     const currentServiceOrder = await this.ensureExists(id);
+    const updateData: Prisma.ServiceOrderUncheckedUpdateInput = {
+      clientId: updateServiceOrderDto.clientId,
+      vehicleId: updateServiceOrderDto.vehicleId,
+      mechanicId: updateServiceOrderDto.mechanicId,
+      problemDescription: updateServiceOrderDto.problemDescription,
+      diagnosis: updateServiceOrderDto.diagnosis,
+      servicesPerformed: updateServiceOrderDto.servicesPerformed,
+      vehicleChecklist: updateServiceOrderDto.vehicleChecklist,
+      notes: updateServiceOrderDto.notes,
+    };
 
     if (
       updateServiceOrderDto.clientId ||
@@ -133,21 +143,15 @@ export class ServiceOrdersService {
       );
     }
 
+    if ('expectedDeliveryAt' in updateServiceOrderDto) {
+      updateData.expectedDeliveryAt = this.parseExpectedDeliveryAt(
+        updateServiceOrderDto.expectedDeliveryAt,
+      );
+    }
+
     const updatedServiceOrder = await this.prisma.serviceOrder.update({
       where: { id },
-      data: {
-        clientId: updateServiceOrderDto.clientId,
-        vehicleId: updateServiceOrderDto.vehicleId,
-        mechanicId: updateServiceOrderDto.mechanicId,
-        problemDescription: updateServiceOrderDto.problemDescription,
-        diagnosis: updateServiceOrderDto.diagnosis,
-        servicesPerformed: updateServiceOrderDto.servicesPerformed,
-        vehicleChecklist: updateServiceOrderDto.vehicleChecklist,
-        expectedDeliveryAt: updateServiceOrderDto.expectedDeliveryAt
-          ? new Date(updateServiceOrderDto.expectedDeliveryAt)
-          : undefined,
-        notes: updateServiceOrderDto.notes,
-      },
+      data: updateData,
     });
 
     return toServiceOrderResponseDto(updatedServiceOrder);
@@ -193,5 +197,34 @@ export class ServiceOrdersService {
     }
 
     return serviceOrder;
+  }
+
+  private parseExpectedDeliveryAt(value: string | null | undefined): Date | null | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    if (value === null) {
+      return null;
+    }
+
+    if (!/^\d{4}-/.test(value)) {
+      throw new BadRequestException('A previsao de entrega deve informar um ano com 4 digitos');
+    }
+
+    const expectedDeliveryAt = new Date(value);
+
+    if (Number.isNaN(expectedDeliveryAt.getTime())) {
+      throw new BadRequestException('A previsao de entrega deve ser uma data valida');
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (expectedDeliveryAt < today) {
+      throw new BadRequestException('A previsao de entrega nao pode ser anterior ao dia atual');
+    }
+
+    return expectedDeliveryAt;
   }
 }

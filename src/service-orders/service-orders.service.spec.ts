@@ -18,6 +18,7 @@ describe('ServiceOrdersService', () => {
   const prismaMock = {
     serviceOrder: {
       create: jest.fn(),
+      findMany: jest.fn(),
       findUnique: jest.fn(),
       update: jest.fn(),
     },
@@ -46,6 +47,7 @@ describe('ServiceOrdersService', () => {
     prismaMock.$transaction.mockImplementation(async (callback: (tx: typeof prismaMock) => unknown) =>
       callback(prismaMock),
     );
+    prismaMock.serviceOrder.findMany.mockResolvedValue([]);
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -205,6 +207,73 @@ describe('ServiceOrdersService', () => {
     await service.updateStatus('os-1', { status: ServiceOrderStatus.ENTREGUE });
 
     expect(prismaMock.financialEntry.create).not.toHaveBeenCalled();
+  });
+
+  it('should update expected delivery date when informed', async () => {
+    const expectedDeliveryAt = '2030-01-02T10:30:00.000Z';
+    prismaMock.serviceOrder.findUnique.mockResolvedValue({
+      id: 'os-1',
+      clientId: 'client-1',
+      vehicleId: 'vehicle-1',
+      mechanicId: null,
+    });
+    prismaMock.serviceOrder.update.mockResolvedValue({
+      id: 'os-1',
+      expectedDeliveryAt: new Date(expectedDeliveryAt),
+    });
+
+    await service.update('os-1', { expectedDeliveryAt });
+
+    expect(prismaMock.serviceOrder.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'os-1' },
+        data: expect.objectContaining({
+          expectedDeliveryAt: new Date(expectedDeliveryAt),
+        }),
+      }),
+    );
+  });
+
+  it('should clear expected delivery date when null is informed', async () => {
+    prismaMock.serviceOrder.findUnique.mockResolvedValue({
+      id: 'os-1',
+      clientId: 'client-1',
+      vehicleId: 'vehicle-1',
+      mechanicId: null,
+    });
+    prismaMock.serviceOrder.update.mockResolvedValue({
+      id: 'os-1',
+      expectedDeliveryAt: null,
+    });
+
+    await service.update('os-1', { expectedDeliveryAt: null });
+
+    expect(prismaMock.serviceOrder.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'os-1' },
+        data: expect.objectContaining({
+          expectedDeliveryAt: null,
+        }),
+      }),
+    );
+  });
+
+  it('should block expected delivery date earlier than today', async () => {
+    prismaMock.serviceOrder.findUnique.mockResolvedValue({
+      id: 'os-1',
+      clientId: 'client-1',
+      vehicleId: 'vehicle-1',
+      mechanicId: null,
+    });
+
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    await expect(
+      service.update('os-1', { expectedDeliveryAt: yesterday.toISOString() }),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(prismaMock.serviceOrder.update).not.toHaveBeenCalled();
   });
 
   it('should return official totals from budget when fetching service order detail', async () => {
