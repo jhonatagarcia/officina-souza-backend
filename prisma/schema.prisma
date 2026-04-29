@@ -23,6 +23,7 @@ enum BudgetStatus {
 enum BudgetItemType {
   PART
   LABOR
+  LABOR_AND_PART
 }
 
 enum ServiceOrderStatus {
@@ -158,6 +159,7 @@ model BudgetItem {
   id                   String             @id @default(uuid()) @db.Uuid
   budgetId             String             @db.Uuid
   serviceCatalogItemId String?            @db.Uuid
+  inventoryItemId      String?            @db.Uuid
   type                 BudgetItemType
   serviceCode          String?
   description          String
@@ -168,10 +170,12 @@ model BudgetItem {
   updatedAt            DateTime           @updatedAt
   budget               Budget             @relation(fields: [budgetId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   serviceCatalogItem   ServiceCatalogItem? @relation(fields: [serviceCatalogItemId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  inventoryItem        InventoryItem?     @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([budgetId])
   @@index([budgetId, type])
   @@index([serviceCatalogItemId])
+  @@index([inventoryItemId])
 }
 
 model ServiceOrder {
@@ -212,17 +216,18 @@ model ServiceOrder {
 }
 
 model InventoryItem {
-  id               String             @id @default(uuid()) @db.Uuid
-  name             String
-  internalCode     String             @unique
-  category         String?
-  supplier         String?
-  quantity         Int                @default(0)
-  minimumQuantity  Int                @default(0)
-  cost             Decimal            @db.Decimal(12, 2)
-  salePrice        Decimal            @db.Decimal(12, 2)
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
+  id                String           @id @default(uuid()) @db.Uuid
+  name              String
+  internalCode      String           @unique
+  category          String?
+  supplier          String?
+  quantity          Int              @default(0)
+  minimumQuantity   Int              @default(0)
+  cost              Decimal          @db.Decimal(12, 2)
+  salePrice         Decimal          @db.Decimal(12, 2)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  budgetItems       BudgetItem[]
   serviceOrderParts ServiceOrderPart[]
 
   @@index([name])

@@ -28,6 +28,12 @@ export interface ServiceOrderPartInventorySummaryDto {
   internalCode: string;
 }
 
+export interface ServiceOrderBudgetItemInventorySummaryDto {
+  id: string;
+  name: string;
+  internalCode: string;
+}
+
 export interface ServiceOrderPartResponseDto {
   id: string;
   serviceOrderId: string;
@@ -43,9 +49,13 @@ export interface ServiceOrderPartResponseDto {
 export interface ServiceOrderBudgetItemResponseDto {
   id: string;
   type: string;
+  inventoryItemId: string | null;
   serviceCode: string | null;
   description: string;
   quantity: number;
+  unitPrice: Prisma.Decimal;
+  totalPrice: Prisma.Decimal;
+  inventoryItem: ServiceOrderBudgetItemInventorySummaryDto | null;
 }
 
 export interface ServiceOrderResponseDto {
@@ -99,7 +109,12 @@ type ServiceOrderWithRelationsModel = Prisma.ServiceOrderGetPayload<{
   include: {
     budget: {
       include: {
-        items: true;
+        items: {
+          include: {
+            inventoryItem: true;
+            serviceCatalogItem: true;
+          };
+        };
       };
     };
     client: true;
@@ -160,13 +175,33 @@ export function toServiceOrderDetailResponseDto(
 ): ServiceOrderDetailResponseDto {
   const partsTotal = serviceOrder.budget
     ? serviceOrder.budget.items
-        .filter((item) => item.type === 'PART')
-        .reduce((acc, item) => acc.plus(item.totalPrice), new Prisma.Decimal(0))
+        .reduce((acc, item) => {
+          if (item.type === 'PART') {
+            return acc.plus(item.totalPrice);
+          }
+
+          if (item.type === 'LABOR_AND_PART' && item.inventoryItem) {
+            return acc.plus(new Prisma.Decimal(item.inventoryItem.salePrice).mul(item.quantity));
+          }
+
+          return acc;
+        }, new Prisma.Decimal(0))
     : serviceOrder.parts.reduce((acc, part) => acc.plus(part.totalPrice), new Prisma.Decimal(0));
   const laborTotal = serviceOrder.budget
     ? serviceOrder.budget.items
-        .filter((item) => item.type === 'LABOR')
-        .reduce((acc, item) => acc.plus(item.totalPrice), new Prisma.Decimal(0))
+        .reduce((acc, item) => {
+          if (item.type === 'LABOR') {
+            return acc.plus(item.totalPrice);
+          }
+
+          if (item.type === 'LABOR_AND_PART' && item.serviceCatalogItem) {
+            return acc.plus(
+              new Prisma.Decimal(item.serviceCatalogItem.laborPrice).mul(item.quantity),
+            );
+          }
+
+          return acc;
+        }, new Prisma.Decimal(0))
     : new Prisma.Decimal(0);
   const discount = serviceOrder.budget?.discount ?? new Prisma.Decimal(0);
   const total = serviceOrder.budget?.total ?? partsTotal.plus(laborTotal).minus(discount);
@@ -177,13 +212,23 @@ export function toServiceOrderDetailResponseDto(
     laborTotal,
     discount,
     total,
-    budgetItems: (serviceOrder.budget?.items ?? []).map((item) => ({
-      id: item.id,
-      type: item.type,
-      serviceCode: item.serviceCode,
-      description: item.description,
-      quantity: item.quantity,
-    })),
+      budgetItems: (serviceOrder.budget?.items ?? []).map((item) => ({
+        id: item.id,
+        type: item.type,
+        inventoryItemId: item.inventoryItemId,
+        serviceCode: item.serviceCode,
+        description: item.description,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        totalPrice: item.totalPrice,
+        inventoryItem: item.inventoryItem
+          ? {
+              id: item.inventoryItem.id,
+              name: item.inventoryItem.name,
+              internalCode: item.inventoryItem.internalCode,
+            }
+          : null,
+      })),
     client: {
       id: serviceOrder.client.id,
       name: serviceOrder.client.name,

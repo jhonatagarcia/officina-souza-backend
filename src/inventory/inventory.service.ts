@@ -4,13 +4,14 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { FinancialEntryType, FinancialStatus, Prisma } from '@prisma/client';
 import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
 import { buildPaginationMeta, PaginatedResponse } from 'src/common/utils/pagination.util';
 import {
   InventoryItemResponseDto,
   toInventoryItemResponseDto,
 } from 'src/inventory/dto/inventory-item-response.dto';
+import { isLowStock } from 'src/inventory/utils/inventory-stock-status.util';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateInventoryItemDto } from 'src/inventory/dto/create-inventory-item.dto';
 import { UpdateInventoryItemDto } from 'src/inventory/dto/update-inventory-item.dto';
@@ -106,7 +107,7 @@ export class InventoryService {
     });
 
     return items
-      .filter((item) => item.quantity <= item.minimumQuantity)
+      .filter((item) => isLowStock(item.quantity, item.minimumQuantity))
       .map(toInventoryItemResponseDto);
   }
 
@@ -167,7 +168,7 @@ export class InventoryService {
     const lastGeneratedItem = await this.prisma.inventoryItem.findFirst({
       where: {
         internalCode: {
-          startsWith: 'PEC-',
+          startsWith: 'P-',
         },
       },
       orderBy: {
@@ -176,10 +177,10 @@ export class InventoryService {
     });
 
     const lastSequence = lastGeneratedItem
-      ? Number(lastGeneratedItem.internalCode.replace(/^PEC-/, ''))
+      ? Number(lastGeneratedItem.internalCode.replace(/^P-/, ''))
       : 0;
     const nextSequence = Number.isFinite(lastSequence) ? lastSequence + 1 : 1;
 
-    return `PEC-${nextSequence.toString().padStart(6, '0')}`;
+    return `P-${nextSequence.toString().padStart(6, '0')}`;
   }
 }

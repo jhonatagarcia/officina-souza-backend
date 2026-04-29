@@ -46,12 +46,15 @@ describe('InventoryService', () => {
 
   it('should generate internal code automatically when none is provided', async () => {
     prismaMock.inventoryItem.findFirst
-      .mockResolvedValueOnce({ internalCode: 'PEC-000123' })
+      .mockResolvedValueOnce({ internalCode: 'P-000123' })
       .mockResolvedValueOnce(null);
     prismaMock.inventoryItem.create.mockResolvedValue({
       id: 'item-1',
       name: 'Filtro de óleo',
-      internalCode: 'PEC-000124',
+      internalCode: 'P-000124',
+      quantity: 10,
+      minimumQuantity: 2,
+      cost: 10,
     });
 
     await service.create({
@@ -64,7 +67,7 @@ describe('InventoryService', () => {
 
     expect(prismaMock.inventoryItem.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        internalCode: 'PEC-000124',
+        internalCode: 'P-000124',
       }),
     });
   });
@@ -74,12 +77,14 @@ describe('InventoryService', () => {
       { id: '1', quantity: 1, minimumQuantity: 2 },
       { id: '2', quantity: 5, minimumQuantity: 2 },
       { id: '3', quantity: 2, minimumQuantity: 2 },
+      { id: '4', quantity: 15, minimumQuantity: 10 },
+      { id: '5', quantity: 16, minimumQuantity: 10 },
     ]);
 
     const result = await service.getLowStockAlerts();
 
-    expect(result).toHaveLength(2);
-    expect(result.map((item) => item.id)).toEqual(['1', '3']);
+    expect(result).toHaveLength(3);
+    expect(result.map((item) => item.id)).toEqual(['1', '3', '4']);
   });
 
   it('should reserve stock atomically and return updated item', async () => {

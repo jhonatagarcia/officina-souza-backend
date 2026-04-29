@@ -209,6 +209,48 @@ describe('ServiceOrdersService', () => {
     expect(prismaMock.financialEntry.create).not.toHaveBeenCalled();
   });
 
+  it('should create receivable entry from service order parts when there is no linked budget', async () => {
+    const deliveredAt = new Date('2030-01-01T12:00:00.000Z');
+
+    prismaMock.serviceOrder.findUnique
+      .mockResolvedValueOnce({
+        id: 'os-1',
+        status: ServiceOrderStatus.FINALIZADA,
+      })
+      .mockResolvedValueOnce({
+        id: 'os-1',
+        orderNumber: 'OS-123',
+        clientId: 'client-1',
+        deliveredAt,
+        budget: null,
+        parts: [{ totalPrice: new Prisma.Decimal(80) }, { totalPrice: new Prisma.Decimal(20) }],
+        financialEntries: [],
+      });
+    prismaMock.serviceOrder.update.mockResolvedValue({
+      id: 'os-1',
+      status: ServiceOrderStatus.ENTREGUE,
+      deliveredAt,
+    });
+    prismaMock.financialEntry.create.mockResolvedValue({ id: 'fin-1' });
+
+    await service.updateStatus('os-1', {
+      status: ServiceOrderStatus.ENTREGUE,
+    });
+
+    expect(prismaMock.financialEntry.create).toHaveBeenCalledWith({
+      data: {
+        type: 'RECEIVABLE',
+        description: 'Cobranca da OS-123',
+        category: 'Ordem de Servico',
+        amount: expect.any(Prisma.Decimal),
+        dueDate: deliveredAt,
+        status: 'PENDENTE',
+        clientId: 'client-1',
+        serviceOrderId: 'os-1',
+      },
+    });
+  });
+
   it('should update expected delivery date when informed', async () => {
     const expectedDeliveryAt = '2030-01-02T10:30:00.000Z';
     prismaMock.serviceOrder.findUnique.mockResolvedValue({
@@ -298,10 +340,58 @@ describe('ServiceOrdersService', () => {
       updatedAt: new Date('2030-01-01T00:00:00.000Z'),
       budget: {
         discount: new Prisma.Decimal(10),
-        total: new Prisma.Decimal(140),
+        total: new Prisma.Decimal(170),
         items: [
-          { type: 'PART', totalPrice: new Prisma.Decimal(40) },
-          { type: 'LABOR', totalPrice: new Prisma.Decimal(110) },
+          {
+            id: 'item-1',
+            type: 'PART',
+            inventoryItemId: 'inv-1',
+            serviceCode: null,
+            description: 'Lampada led',
+            quantity: 1,
+            unitPrice: new Prisma.Decimal(40),
+            totalPrice: new Prisma.Decimal(40),
+            inventoryItem: {
+              id: 'inv-1',
+              name: 'Lampada led',
+              internalCode: 'P-000001',
+              salePrice: new Prisma.Decimal(40),
+            },
+            serviceCatalogItem: null,
+          },
+          {
+            id: 'item-2',
+            type: 'LABOR_AND_PART',
+            inventoryItemId: 'inv-2',
+            serviceCode: 'SRV-2',
+            description: 'Troca',
+            quantity: 1,
+            unitPrice: new Prisma.Decimal(100),
+            totalPrice: new Prisma.Decimal(100),
+            inventoryItem: {
+              id: 'inv-2',
+              name: 'Soquete',
+              internalCode: 'P-000002',
+              salePrice: new Prisma.Decimal(30),
+            },
+            serviceCatalogItem: {
+              id: 'srv-2',
+              laborPrice: new Prisma.Decimal(70),
+              suggestedTotalPrice: new Prisma.Decimal(70),
+            },
+          },
+          {
+            id: 'item-3',
+            type: 'LABOR',
+            inventoryItemId: null,
+            serviceCode: 'SRV-1',
+            description: 'Diagnóstico',
+            quantity: 1,
+            unitPrice: new Prisma.Decimal(40),
+            totalPrice: new Prisma.Decimal(40),
+            inventoryItem: null,
+            serviceCatalogItem: null,
+          },
         ],
       },
       client: { id: 'client-1', name: 'Cliente', document: null },
@@ -312,10 +402,10 @@ describe('ServiceOrdersService', () => {
 
     const result = await service.findOne('os-1');
 
-    expect(result.partsTotal.toNumber()).toBe(40);
+    expect(result.partsTotal.toNumber()).toBe(70);
     expect(result.laborTotal.toNumber()).toBe(110);
     expect(result.discount.toNumber()).toBe(10);
-    expect(result.total.toNumber()).toBe(140);
+    expect(result.total.toNumber()).toBe(170);
   });
 
   it('should consolidate part quantities when the same inventory item is added again', async () => {

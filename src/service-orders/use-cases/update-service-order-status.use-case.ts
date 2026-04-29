@@ -135,6 +135,11 @@ export class UpdateServiceOrderStatusUseCase {
       where: { id: serviceOrderId },
       include: {
         budget: true,
+        parts: {
+          select: {
+            totalPrice: true,
+          },
+        },
         financialEntries: {
           where: { type: FinancialEntryType.RECEIVABLE },
           select: { id: true },
@@ -151,7 +156,9 @@ export class UpdateServiceOrderStatusUseCase {
       return;
     }
 
-    const amount = serviceOrder.budget?.total;
+    const amount =
+      serviceOrder.budget?.total ??
+      serviceOrder.parts.reduce((total, part) => total.plus(part.totalPrice), new Prisma.Decimal(0));
 
     if (!amount || amount.lte(0)) {
       return;

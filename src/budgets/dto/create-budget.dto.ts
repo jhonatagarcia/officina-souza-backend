@@ -29,6 +29,11 @@ class CreateBudgetItemDto {
   @IsUUID()
   serviceCatalogItemId?: string;
 
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  inventoryItemId?: string;
+
   @ApiProperty()
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(1)

@@ -9,6 +9,7 @@ describe('DashboardService', () => {
   const prismaMock = {
     serviceOrder: {
       count: jest.fn(),
+      findMany: jest.fn(),
     },
     budget: {
       count: jest.fn(),
@@ -60,9 +61,42 @@ describe('DashboardService', () => {
         internalCode: 'PEC-000003',
       },
     ]);
-    prismaMock.financialEntry.aggregate.mockResolvedValue({
-      _sum: { amount: new Prisma.Decimal(350) },
-    });
+    prismaMock.financialEntry.aggregate
+      .mockResolvedValueOnce({
+        _sum: { amount: new Prisma.Decimal(350) },
+      });
+    prismaMock.serviceOrder.findMany.mockResolvedValue([
+      {
+        parts: [
+          {
+            quantity: 2,
+            inventoryItem: {
+              cost: new Prisma.Decimal(30),
+            },
+          },
+          {
+            quantity: 3,
+            inventoryItem: {
+              cost: new Prisma.Decimal(40),
+            },
+          },
+        ],
+        budget: null,
+      },
+      {
+        parts: [],
+        budget: {
+          items: [
+            {
+              quantity: 1,
+              inventoryItem: {
+                cost: new Prisma.Decimal(50),
+              },
+            },
+          ],
+        },
+      },
+    ]);
 
     const result = await service.getSummary();
 
@@ -77,6 +111,7 @@ describe('DashboardService', () => {
       },
       financial: {
         monthRevenue: new Prisma.Decimal(350),
+        stockOutValue: new Prisma.Decimal(230),
       },
       inventory: {
         lowStockCount: 2,
@@ -96,6 +131,45 @@ describe('DashboardService', () => {
             internalCode: 'PEC-000003',
           },
         ],
+      },
+    });
+
+    expect(prismaMock.serviceOrder.findMany).toHaveBeenCalledWith({
+      where: {
+        status: 'ENTREGUE',
+        deliveredAt: {
+          gte: expect.any(Date),
+        },
+      },
+      include: {
+        parts: {
+          select: {
+            quantity: true,
+            inventoryItem: {
+              select: {
+                cost: true,
+              },
+            },
+          },
+        },
+        budget: {
+          include: {
+            items: {
+              where: {
+                inventoryItemId: {
+                  not: null,
+                },
+              },
+              include: {
+                inventoryItem: {
+                  select: {
+                    cost: true,
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     });
   });

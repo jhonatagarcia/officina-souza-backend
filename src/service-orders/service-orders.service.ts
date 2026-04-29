@@ -96,7 +96,12 @@ export class ServiceOrdersService {
       include: {
         budget: {
           include: {
-            items: true,
+            items: {
+              include: {
+                inventoryItem: true,
+                serviceCatalogItem: true,
+              },
+            },
           },
         },
         client: true,

@@ -180,7 +180,10 @@ export class FinancialService {
     return toFinancialEntryResponseDto(updated);
   }
 
-  private async validateReferences(clientId?: string, serviceOrderId?: string) {
+  private async validateReferences(
+    clientId?: string,
+    serviceOrderId?: string,
+  ) {
     const [client, serviceOrder] = await Promise.all([
       clientId ? this.clientsService.ensureExists(clientId) : Promise.resolve(null),
       serviceOrderId

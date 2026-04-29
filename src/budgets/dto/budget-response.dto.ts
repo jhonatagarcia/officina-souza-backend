@@ -5,6 +5,7 @@ export interface BudgetItemResponseDto {
   budgetId: string;
   type: string;
   serviceCatalogItemId: string | null;
+  inventoryItemId: string | null;
   serviceCode: string | null;
   description: string;
   quantity: number;
@@ -74,6 +75,7 @@ export function toBudgetItemResponseDto(item: BudgetItemModel): BudgetItemRespon
     budgetId: item.budgetId,
     type: item.type,
     serviceCatalogItemId: item.serviceCatalogItemId,
+    inventoryItemId: item.inventoryItemId,
     serviceCode: item.serviceCode,
     description: item.description,
     quantity: item.quantity,

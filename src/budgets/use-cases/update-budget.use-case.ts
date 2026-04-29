@@ -38,6 +38,9 @@ export class UpdateBudgetUseCase {
     const serviceCatalogItems = updateBudgetDto.items
       ? await this.loadServiceCatalogItems(updateBudgetDto.items)
       : new Map<string, { id: string; code: string; active: boolean }>();
+    const inventoryItems = updateBudgetDto.items
+      ? await this.loadInventoryItems(updateBudgetDto.items)
+      : new Map<string, { id: string }>();
 
     return this.prisma.$transaction(async (tx) => {
       if (updateBudgetDto.items) {
@@ -61,6 +64,7 @@ export class UpdateBudgetUseCase {
                   serviceCode: item.serviceCatalogItemId
                     ? serviceCatalogItems.get(item.serviceCatalogItemId)?.code
                     : null,
+                  inventoryItemId: inventoryItems.get(item.inventoryItemId ?? '')?.id ?? null,
                   totalPrice: item.quantity * item.unitPrice,
                 })),
               }
@@ -97,8 +101,45 @@ export class UpdateBudgetUseCase {
       }
 
       const serviceCatalogItem = byId.get(item.serviceCatalogItemId);
-      if (!serviceCatalogItem || !serviceCatalogItem.active || item.type !== BudgetItemType.LABOR) {
+      if (
+        !serviceCatalogItem ||
+        !serviceCatalogItem.active ||
+        (item.type !== BudgetItemType.LABOR && item.type !== BudgetItemType.LABOR_AND_PART)
+      ) {
         throw new BadRequestException('Servico informado para o item do orcamento e invalido');
+      }
+    });
+
+    return byId;
+  }
+
+  private async loadInventoryItems(items: NonNullable<UpdateBudgetDto['items']>) {
+    const inventoryItemIds = [
+      ...new Set(
+        items
+          .map((item) => item.inventoryItemId)
+          .filter((inventoryItemId): inventoryItemId is string => Boolean(inventoryItemId)),
+      ),
+    ];
+
+    if (!inventoryItemIds.length) {
+      return new Map<string, { id: string }>();
+    }
+
+    const inventoryItems = await this.prisma.inventoryItem.findMany({
+      where: { id: { in: inventoryItemIds } },
+      select: { id: true },
+    });
+
+    const byId = new Map(inventoryItems.map((item) => [item.id, item]));
+
+    items.forEach((item) => {
+      if (item.type !== BudgetItemType.LABOR_AND_PART && item.type !== BudgetItemType.PART) {
+        return;
+      }
+
+      if (!item.inventoryItemId || !byId.get(item.inventoryItemId)) {
+        throw new BadRequestException('Peca ou produto informado para o item do orcamento e invalido');
       }
     });
 

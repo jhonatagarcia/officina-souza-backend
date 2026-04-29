@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { FinancialEntryType, FinancialStatus, Prisma, ServiceOrderStatus } from '@prisma/client';
+import { isLowStock } from 'src/inventory/utils/inventory-stock-status.util';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 @Injectable()
@@ -18,6 +19,7 @@ export class DashboardService {
       pendingBudgets,
       lowStockItemsRaw,
       financialSummary,
+      deliveredOrders,
     ] = await Promise.all([
       this.prisma.serviceOrder.count({ where: { status: ServiceOrderStatus.ABERTA } }),
       this.prisma.serviceOrder.count({ where: { status: ServiceOrderStatus.EM_ANDAMENTO } }),
@@ -34,9 +36,68 @@ export class DashboardService {
           paidAt: { gte: startOfMonth },
         },
       }),
+      this.prisma.serviceOrder.findMany({
+        where: {
+          status: ServiceOrderStatus.ENTREGUE,
+          deliveredAt: { gte: startOfMonth },
+        },
+        include: {
+          parts: {
+            select: {
+              quantity: true,
+              inventoryItem: {
+                select: {
+                  cost: true,
+                },
+              },
+            },
+          },
+          budget: {
+            include: {
+              items: {
+                where: {
+                  inventoryItemId: {
+                    not: null,
+                  },
+                },
+                include: {
+                  inventoryItem: {
+                    select: {
+                      cost: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
     ]);
 
-    const lowStockItems = lowStockItemsRaw.filter((item) => item.quantity <= item.minimumQuantity);
+    const lowStockItems = lowStockItemsRaw.filter((item) =>
+      isLowStock(item.quantity, item.minimumQuantity),
+    );
+    const stockOutValue = deliveredOrders.reduce((ordersTotal, serviceOrder) => {
+      if (serviceOrder.parts.length > 0) {
+        const partsCost = serviceOrder.parts.reduce(
+          (partsTotal, part) =>
+            partsTotal.add(new Prisma.Decimal(part.inventoryItem.cost).mul(part.quantity)),
+          new Prisma.Decimal(0),
+        );
+
+        return ordersTotal.add(partsCost);
+      }
+
+      const budgetItemsCost = (serviceOrder.budget?.items ?? []).reduce(
+        (itemsTotal, item) =>
+          item.inventoryItem
+            ? itemsTotal.add(new Prisma.Decimal(item.inventoryItem.cost).mul(item.quantity))
+            : itemsTotal,
+        new Prisma.Decimal(0),
+      );
+
+      return ordersTotal.add(budgetItemsCost);
+    }, new Prisma.Decimal(0));
 
     return {
       serviceOrders: {
@@ -49,6 +110,7 @@ export class DashboardService {
       },
       financial: {
         monthRevenue: financialSummary._sum.amount ?? new Prisma.Decimal(0),
+        stockOutValue,
       },
       inventory: {
         lowStockCount: lowStockItems.length,

@@ -23,7 +23,7 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql://postgres:postgres:5432/oficina_db?schema=public
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/oficina_db?schema=public
     ports:
       - '3000:3000'
     command: sh -c "npm run prisma:generate && npm run prisma:migrate:deploy && npm run start"
