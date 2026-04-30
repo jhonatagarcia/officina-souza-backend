@@ -173,4 +173,42 @@ describe('DashboardService', () => {
       },
     });
   });
+
+  it('should sum stock output from both service order parts and linked budget inventory items on delivered orders', async () => {
+    prismaMock.serviceOrder.count
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0);
+    prismaMock.budget.count.mockResolvedValue(0);
+    prismaMock.inventoryItem.findMany.mockResolvedValue([]);
+    prismaMock.financialEntry.aggregate.mockResolvedValue({
+      _sum: { amount: new Prisma.Decimal(0) },
+    });
+    prismaMock.serviceOrder.findMany.mockResolvedValue([
+      {
+        parts: [
+          {
+            quantity: 2,
+            inventoryItem: {
+              cost: new Prisma.Decimal(15),
+            },
+          },
+        ],
+        budget: {
+          items: [
+            {
+              quantity: 3,
+              inventoryItem: {
+                cost: new Prisma.Decimal(20),
+              },
+            },
+          ],
+        },
+      },
+    ]);
+
+    const result = await service.getSummary();
+
+    expect(result.financial.stockOutValue).toEqual(new Prisma.Decimal(90));
+  });
 });

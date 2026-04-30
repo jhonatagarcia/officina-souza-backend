@@ -78,15 +78,11 @@ export class DashboardService {
       isLowStock(item.quantity, item.minimumQuantity),
     );
     const stockOutValue = deliveredOrders.reduce((ordersTotal, serviceOrder) => {
-      if (serviceOrder.parts.length > 0) {
-        const partsCost = serviceOrder.parts.reduce(
-          (partsTotal, part) =>
-            partsTotal.add(new Prisma.Decimal(part.inventoryItem.cost).mul(part.quantity)),
-          new Prisma.Decimal(0),
-        );
-
-        return ordersTotal.add(partsCost);
-      }
+      const partsCost = serviceOrder.parts.reduce(
+        (partsTotal, part) =>
+          partsTotal.add(new Prisma.Decimal(part.inventoryItem.cost).mul(part.quantity)),
+        new Prisma.Decimal(0),
+      );
 
       const budgetItemsCost = (serviceOrder.budget?.items ?? []).reduce(
         (itemsTotal, item) =>
@@ -96,7 +92,7 @@ export class DashboardService {
         new Prisma.Decimal(0),
       );
 
-      return ordersTotal.add(budgetItemsCost);
+      return ordersTotal.add(partsCost).add(budgetItemsCost);
     }, new Prisma.Decimal(0));
 
     return {
