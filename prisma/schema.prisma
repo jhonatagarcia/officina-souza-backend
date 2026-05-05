@@ -67,6 +67,11 @@ enum ServiceMaterialSource {
   FLEXIBLE
 }
 
+enum InventoryMovementType {
+  OUT
+  ADJUSTMENT
+}
+
 model User {
   id             String         @id @default(uuid()) @db.Uuid
   name           String
@@ -204,6 +209,7 @@ model ServiceOrder {
   parts              ServiceOrderPart[]
   financialEntries   FinancialEntry[]
   historyEntries     VehicleHistory[]
+  inventoryMovements InventoryMovement[]
 
   @@unique([id, clientId])
   @@index([clientId])
@@ -229,6 +235,7 @@ model InventoryItem {
   updatedAt         DateTime         @updatedAt
   budgetItems       BudgetItem[]
   serviceOrderParts ServiceOrderPart[]
+  movements         InventoryMovement[]
 
   @@index([name])
   @@index([internalCode])
@@ -272,11 +279,35 @@ model ServiceOrderPart {
   updatedAt       DateTime       @updatedAt
   serviceOrder    ServiceOrder   @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   inventoryItem   InventoryItem  @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  movements       InventoryMovement[]
 
   @@unique([serviceOrderId, inventoryItemId])
   @@index([serviceOrderId])
   @@index([inventoryItemId])
   @@index([inventoryItemId, createdAt])
+}
+
+model InventoryMovement {
+  id                 String                @id @default(uuid()) @db.Uuid
+  inventoryItemId    String                @db.Uuid
+  serviceOrderId     String?               @db.Uuid
+  serviceOrderPartId String?               @db.Uuid
+  type               InventoryMovementType
+  quantityChange     Int
+  quantityBefore     Int
+  quantityAfter      Int
+  unitCost           Decimal?              @db.Decimal(12, 2)
+  totalCost          Decimal?              @db.Decimal(12, 2)
+  reason             String?
+  createdAt          DateTime              @default(now())
+  inventoryItem      InventoryItem         @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  serviceOrder       ServiceOrder?         @relation(fields: [serviceOrderId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  serviceOrderPart   ServiceOrderPart?     @relation(fields: [serviceOrderPartId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([inventoryItemId, createdAt])
+  @@index([serviceOrderId])
+  @@index([serviceOrderPartId])
+  @@index([type, createdAt])
 }
 
 model FinancialEntry {

@@ -11,6 +11,8 @@ export class DashboardService {
     const startOfMonth = new Date();
     startOfMonth.setDate(1);
     startOfMonth.setHours(0, 0, 0, 0);
+    const startOfNextMonth = new Date(startOfMonth);
+    startOfNextMonth.setMonth(startOfNextMonth.getMonth() + 1);
 
     const [
       openOrders,
@@ -19,7 +21,8 @@ export class DashboardService {
       pendingBudgets,
       lowStockItemsRaw,
       financialSummary,
-      deliveredOrders,
+      paidServiceOrders,
+      unbilledPartsSummary,
     ] = await Promise.all([
       this.prisma.serviceOrder.count({ where: { status: ServiceOrderStatus.ABERTA } }),
       this.prisma.serviceOrder.count({ where: { status: ServiceOrderStatus.EM_ANDAMENTO } }),
@@ -32,14 +35,17 @@ export class DashboardService {
         _sum: { amount: true },
         where: {
           type: FinancialEntryType.RECEIVABLE,
-          status: FinancialStatus.PAGO,
-          paidAt: { gte: startOfMonth },
+          dueDate: { gte: startOfMonth, lt: startOfNextMonth },
         },
       }),
       this.prisma.serviceOrder.findMany({
         where: {
-          status: ServiceOrderStatus.ENTREGUE,
-          deliveredAt: { gte: startOfMonth },
+          financialEntries: {
+            some: {
+              type: FinancialEntryType.RECEIVABLE,
+              status: FinancialStatus.PAGO,
+            },
+          },
         },
         include: {
           parts: {
@@ -60,7 +66,8 @@ export class DashboardService {
                     not: null,
                   },
                 },
-                include: {
+                select: {
+                  quantity: true,
                   inventoryItem: {
                     select: {
                       cost: true,
@@ -72,27 +79,47 @@ export class DashboardService {
           },
         },
       }),
+      this.prisma.serviceOrderPart.aggregate({
+        _sum: { totalPrice: true },
+        where: {
+          updatedAt: { gte: startOfMonth, lt: startOfNextMonth },
+          serviceOrder: {
+            financialEntries: {
+              none: {
+                type: FinancialEntryType.RECEIVABLE,
+              },
+            },
+          },
+        },
+      }),
     ]);
 
     const lowStockItems = lowStockItemsRaw.filter((item) =>
       isLowStock(item.quantity, item.minimumQuantity),
     );
-    const stockOutValue = deliveredOrders.reduce((ordersTotal, serviceOrder) => {
-      const partsCost = serviceOrder.parts.reduce(
-        (partsTotal, part) =>
-          partsTotal.add(new Prisma.Decimal(part.inventoryItem.cost).mul(part.quantity)),
-        new Prisma.Decimal(0),
-      );
+    const monthRevenue = new Prisma.Decimal(financialSummary._sum.amount ?? 0).add(
+      unbilledPartsSummary._sum.totalPrice ?? 0,
+    );
+    const stockOutValue = paidServiceOrders.reduce((ordersTotal, serviceOrder) => {
+      if (serviceOrder.parts.length > 0) {
+        return ordersTotal.add(
+          serviceOrder.parts.reduce(
+            (partsTotal, part) =>
+              partsTotal.add(new Prisma.Decimal(part.inventoryItem.cost).mul(part.quantity)),
+            new Prisma.Decimal(0),
+          ),
+        );
+      }
 
-      const budgetItemsCost = (serviceOrder.budget?.items ?? []).reduce(
-        (itemsTotal, item) =>
-          item.inventoryItem
-            ? itemsTotal.add(new Prisma.Decimal(item.inventoryItem.cost).mul(item.quantity))
-            : itemsTotal,
-        new Prisma.Decimal(0),
+      return ordersTotal.add(
+        (serviceOrder.budget?.items ?? []).reduce(
+          (itemsTotal, item) =>
+            item.inventoryItem
+              ? itemsTotal.add(new Prisma.Decimal(item.inventoryItem.cost).mul(item.quantity))
+              : itemsTotal,
+          new Prisma.Decimal(0),
+        ),
       );
-
-      return ordersTotal.add(partsCost).add(budgetItemsCost);
     }, new Prisma.Decimal(0));
 
     return {
@@ -105,7 +132,7 @@ export class DashboardService {
         pending: pendingBudgets,
       },
       financial: {
-        monthRevenue: financialSummary._sum.amount ?? new Prisma.Decimal(0),
+        monthRevenue,
         stockOutValue,
       },
       inventory: {

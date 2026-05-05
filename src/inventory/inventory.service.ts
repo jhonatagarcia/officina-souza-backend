@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { FinancialEntryType, FinancialStatus, Prisma } from '@prisma/client';
+import { InventoryMovementType, Prisma } from '@prisma/client';
 import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
 import { buildPaginationMeta, PaginatedResponse } from 'src/common/utils/pagination.util';
 import {
@@ -14,6 +14,10 @@ import {
 import { isLowStock } from 'src/inventory/utils/inventory-stock-status.util';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateInventoryItemDto } from 'src/inventory/dto/create-inventory-item.dto';
+import {
+  InventoryMovementResponseDto,
+  toInventoryMovementResponseDto,
+} from 'src/inventory/dto/inventory-movement-response.dto';
 import { UpdateInventoryItemDto } from 'src/inventory/dto/update-inventory-item.dto';
 
 const INVENTORY_ORDERABLE_FIELDS = new Set(['name', 'internalCode', 'quantity', 'createdAt']);
@@ -87,15 +91,45 @@ export class InventoryService {
     id: string,
     updateInventoryItemDto: UpdateInventoryItemDto,
   ): Promise<InventoryItemResponseDto> {
-    await this.findOne(id);
+    const currentItem = await this.prisma.inventoryItem.findUnique({
+      where: { id },
+    });
+
+    if (!currentItem) {
+      throw new NotFoundException('Item de estoque nao encontrado');
+    }
 
     if (updateInventoryItemDto.internalCode) {
       await this.ensureUniqueCode(updateInventoryItemDto.internalCode, id);
     }
 
-    const item = await this.prisma.inventoryItem.update({
-      where: { id },
-      data: updateInventoryItemDto,
+    const item = await this.prisma.$transaction(async (tx) => {
+      const updatedItem = await tx.inventoryItem.update({
+        where: { id },
+        data: updateInventoryItemDto,
+      });
+
+      if (
+        updateInventoryItemDto.quantity !== undefined &&
+        updateInventoryItemDto.quantity !== currentItem.quantity
+      ) {
+        const quantityChange = updateInventoryItemDto.quantity - currentItem.quantity;
+
+        await tx.inventoryMovement.create({
+          data: {
+            inventoryItemId: id,
+            type: InventoryMovementType.ADJUSTMENT,
+            quantityChange,
+            quantityBefore: currentItem.quantity,
+            quantityAfter: updateInventoryItemDto.quantity,
+            unitCost: updatedItem.cost,
+            totalCost: new Prisma.Decimal(updatedItem.cost).mul(Math.abs(quantityChange)),
+            reason: 'Ajuste manual de estoque',
+          },
+        });
+      }
+
+      return updatedItem;
     });
 
     return toInventoryItemResponseDto(item);
@@ -111,10 +145,34 @@ export class InventoryService {
       .map(toInventoryItemResponseDto);
   }
 
+  async getMovements(inventoryItemId: string): Promise<InventoryMovementResponseDto[]> {
+    await this.findOne(inventoryItemId);
+
+    const movements = await this.prisma.inventoryMovement.findMany({
+      where: { inventoryItemId },
+      orderBy: { createdAt: 'desc' },
+      take: 8,
+      include: {
+        serviceOrder: {
+          include: {
+            client: true,
+          },
+        },
+      },
+    });
+
+    return movements.map(toInventoryMovementResponseDto);
+  }
+
   async reserveOrConsumePart(
     inventoryItemId: string,
     quantity: number,
     tx: Prisma.TransactionClient,
+    context?: {
+      serviceOrderId?: string;
+      serviceOrderPartId?: string;
+      reason?: string;
+    },
   ) {
     if (quantity <= 0) {
       throw new BadRequestException('A quantidade deve ser maior que zero');
@@ -135,9 +193,26 @@ export class InventoryService {
     });
 
     if (result.count > 0) {
-      return tx.inventoryItem.findUniqueOrThrow({
+      const updatedItem = await tx.inventoryItem.findUniqueOrThrow({
         where: { id: inventoryItemId },
       });
+
+      await tx.inventoryMovement.create({
+        data: {
+          inventoryItemId,
+          serviceOrderId: context?.serviceOrderId,
+          serviceOrderPartId: context?.serviceOrderPartId,
+          type: InventoryMovementType.OUT,
+          quantityChange: -quantity,
+          quantityBefore: updatedItem.quantity + quantity,
+          quantityAfter: updatedItem.quantity,
+          unitCost: updatedItem.cost,
+          totalCost: new Prisma.Decimal(updatedItem.cost).mul(quantity),
+          reason: context?.reason ?? 'Saida de estoque por ordem de servico',
+        },
+      });
+
+      return updatedItem;
     }
 
     const item = await tx.inventoryItem.findUnique({

@@ -1,0 +1,3 @@
+-- Placeholder migration file.
+-- This migration directory existed without SQL content and Prisma requires
+-- every migration directory to contain a migration.sql file.

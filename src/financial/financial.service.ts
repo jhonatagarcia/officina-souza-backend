@@ -105,6 +105,108 @@ export class FinancialService {
     return toFinancialEntryResponseDto(entry);
   }
 
+  async getSummary() {
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+    const startOfNextMonth = new Date(startOfMonth);
+    startOfNextMonth.setMonth(startOfNextMonth.getMonth() + 1);
+
+    const [receivablesSummary, paidServiceOrders, unbilledPartsSummary] = await Promise.all([
+      this.prisma.financialEntry.aggregate({
+        _sum: { amount: true },
+        where: {
+          type: FinancialEntryType.RECEIVABLE,
+          dueDate: { gte: startOfMonth, lt: startOfNextMonth },
+        },
+      }),
+      this.prisma.serviceOrder.findMany({
+        where: {
+          financialEntries: {
+            some: {
+              type: FinancialEntryType.RECEIVABLE,
+              status: FinancialStatus.PAGO,
+            },
+          },
+        },
+        include: {
+          parts: {
+            select: {
+              quantity: true,
+              inventoryItem: {
+                select: {
+                  cost: true,
+                },
+              },
+            },
+          },
+          budget: {
+            include: {
+              items: {
+                where: {
+                  inventoryItemId: {
+                    not: null,
+                  },
+                },
+                select: {
+                  quantity: true,
+                  inventoryItem: {
+                    select: {
+                      cost: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+      this.prisma.serviceOrderPart.aggregate({
+        _sum: { totalPrice: true },
+        where: {
+          updatedAt: { gte: startOfMonth, lt: startOfNextMonth },
+          serviceOrder: {
+            financialEntries: {
+              none: {
+                type: FinancialEntryType.RECEIVABLE,
+              },
+            },
+          },
+        },
+      }),
+    ]);
+
+    const receivablesValue = new Prisma.Decimal(receivablesSummary._sum.amount ?? 0).add(
+      unbilledPartsSummary._sum.totalPrice ?? 0,
+    );
+    const stockOutValue = paidServiceOrders.reduce((ordersTotal, serviceOrder) => {
+      if (serviceOrder.parts.length > 0) {
+        return ordersTotal.add(
+          serviceOrder.parts.reduce(
+            (partsTotal, part) =>
+              partsTotal.add(new Prisma.Decimal(part.inventoryItem.cost).mul(part.quantity)),
+            new Prisma.Decimal(0),
+          ),
+        );
+      }
+
+      return ordersTotal.add(
+        (serviceOrder.budget?.items ?? []).reduce(
+          (itemsTotal, item) =>
+            item.inventoryItem
+              ? itemsTotal.add(new Prisma.Decimal(item.inventoryItem.cost).mul(item.quantity))
+              : itemsTotal,
+          new Prisma.Decimal(0),
+        ),
+      );
+    }, new Prisma.Decimal(0));
+
+    return {
+      receivablesValue,
+      stockOutValue,
+    };
+  }
+
   async update(
     id: string,
     updateFinancialEntryDto: UpdateFinancialEntryDto,

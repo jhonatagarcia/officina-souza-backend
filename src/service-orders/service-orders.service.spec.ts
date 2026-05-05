@@ -12,6 +12,14 @@ import { UpdateServiceOrderStatusUseCase } from 'src/service-orders/use-cases/up
 import { UsersService } from 'src/users/users.service';
 import { VehiclesService } from 'src/vehicles/vehicles.service';
 
+function toDateInputValue(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
 describe('ServiceOrdersService', () => {
   let service: ServiceOrdersService;
 
@@ -23,6 +31,13 @@ describe('ServiceOrdersService', () => {
       update: jest.fn(),
     },
     financialEntry: {
+      create: jest.fn(),
+    },
+    inventoryItem: {
+      updateMany: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
+    },
+    inventoryMovement: {
       create: jest.fn(),
     },
     serviceOrderPart: {
@@ -110,6 +125,26 @@ describe('ServiceOrdersService', () => {
     expect(result.status).toBe(ServiceOrderStatus.FINALIZADA);
     expect(prismaMock.serviceOrder.update).toHaveBeenCalled();
     expect(prismaMock.vehicleHistory.create).toHaveBeenCalled();
+  });
+
+  it('should not call external WhatsApp API when status is unchanged', async () => {
+    const fetchMock = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue({ ok: true } as Response);
+    prismaMock.serviceOrder.findUnique.mockResolvedValueOnce({
+      id: 'os-1',
+      status: ServiceOrderStatus.EM_ANDAMENTO,
+    });
+    prismaMock.serviceOrder.update.mockResolvedValue({
+      id: 'os-1',
+      status: ServiceOrderStatus.EM_ANDAMENTO,
+    });
+
+    await service.updateStatus('os-1', { status: ServiceOrderStatus.EM_ANDAMENTO });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    fetchMock.mockRestore();
   });
 
   it('should update existing vehicle history instead of creating duplicate entry', async () => {
@@ -252,7 +287,7 @@ describe('ServiceOrdersService', () => {
   });
 
   it('should update expected delivery date when informed', async () => {
-    const expectedDeliveryAt = '2030-01-02T10:30:00.000Z';
+    const expectedDeliveryAt = '2030-01-02';
     prismaMock.serviceOrder.findUnique.mockResolvedValue({
       id: 'os-1',
       clientId: 'client-1',
@@ -261,7 +296,7 @@ describe('ServiceOrdersService', () => {
     });
     prismaMock.serviceOrder.update.mockResolvedValue({
       id: 'os-1',
-      expectedDeliveryAt: new Date(expectedDeliveryAt),
+      expectedDeliveryAt: new Date('2030-01-02T12:00:00.000Z'),
     });
 
     await service.update('os-1', { expectedDeliveryAt });
@@ -270,7 +305,31 @@ describe('ServiceOrdersService', () => {
       expect.objectContaining({
         where: { id: 'os-1' },
         data: expect.objectContaining({
-          expectedDeliveryAt: new Date(expectedDeliveryAt),
+          expectedDeliveryAt: new Date('2030-01-02T12:00:00.000Z'),
+        }),
+      }),
+    );
+  });
+
+  it('should normalize expected delivery ISO values without shifting the selected day', async () => {
+    prismaMock.serviceOrder.findUnique.mockResolvedValue({
+      id: 'os-1',
+      clientId: 'client-1',
+      vehicleId: 'vehicle-1',
+      mechanicId: null,
+    });
+    prismaMock.serviceOrder.update.mockResolvedValue({
+      id: 'os-1',
+      expectedDeliveryAt: new Date('2030-01-02T12:00:00.000Z'),
+    });
+
+    await service.update('os-1', { expectedDeliveryAt: '2030-01-02T23:59:59.000Z' });
+
+    expect(prismaMock.serviceOrder.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'os-1' },
+        data: expect.objectContaining({
+          expectedDeliveryAt: new Date('2030-01-02T12:00:00.000Z'),
         }),
       }),
     );
@@ -312,7 +371,7 @@ describe('ServiceOrdersService', () => {
     yesterday.setDate(yesterday.getDate() - 1);
 
     await expect(
-      service.update('os-1', { expectedDeliveryAt: yesterday.toISOString() }),
+      service.update('os-1', { expectedDeliveryAt: toDateInputValue(yesterday) }),
     ).rejects.toThrow(BadRequestException);
 
     expect(prismaMock.serviceOrder.update).not.toHaveBeenCalled();
@@ -436,7 +495,15 @@ describe('ServiceOrdersService', () => {
       unitPrice: 15,
     });
 
-    expect(inventoryServiceMock.reserveOrConsumePart).toHaveBeenCalledWith('item-1', 3, prismaMock);
+    expect(inventoryServiceMock.reserveOrConsumePart).toHaveBeenCalledWith(
+      'item-1',
+      3,
+      prismaMock,
+      expect.objectContaining({
+        serviceOrderId: 'os-1',
+        serviceOrderPartId: 'part-1',
+      }),
+    );
     expect(prismaMock.serviceOrderPart.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'part-1' },

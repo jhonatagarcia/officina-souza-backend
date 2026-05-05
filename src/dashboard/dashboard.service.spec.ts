@@ -20,6 +20,9 @@ describe('DashboardService', () => {
     financialEntry: {
       aggregate: jest.fn(),
     },
+    serviceOrderPart: {
+      aggregate: jest.fn(),
+    },
   };
 
   beforeEach(async () => {
@@ -65,24 +68,9 @@ describe('DashboardService', () => {
       .mockResolvedValueOnce({
         _sum: { amount: new Prisma.Decimal(350) },
       });
+    prismaMock.serviceOrderPart.aggregate
+      .mockResolvedValueOnce({ _sum: { totalPrice: new Prisma.Decimal(90) } });
     prismaMock.serviceOrder.findMany.mockResolvedValue([
-      {
-        parts: [
-          {
-            quantity: 2,
-            inventoryItem: {
-              cost: new Prisma.Decimal(30),
-            },
-          },
-          {
-            quantity: 3,
-            inventoryItem: {
-              cost: new Prisma.Decimal(40),
-            },
-          },
-        ],
-        budget: null,
-      },
       {
         parts: [],
         budget: {
@@ -90,11 +78,28 @@ describe('DashboardService', () => {
             {
               quantity: 1,
               inventoryItem: {
-                cost: new Prisma.Decimal(50),
+                cost: new Prisma.Decimal(35),
               },
             },
           ],
         },
+      },
+      {
+        parts: [
+          {
+            quantity: 2,
+            inventoryItem: {
+              cost: new Prisma.Decimal(40),
+            },
+          },
+          {
+            quantity: 1,
+            inventoryItem: {
+              cost: new Prisma.Decimal(20),
+            },
+          },
+        ],
+        budget: null,
       },
     ]);
 
@@ -110,8 +115,8 @@ describe('DashboardService', () => {
         pending: 4,
       },
       financial: {
-        monthRevenue: new Prisma.Decimal(350),
-        stockOutValue: new Prisma.Decimal(230),
+        monthRevenue: new Prisma.Decimal(440),
+        stockOutValue: new Prisma.Decimal(135),
       },
       inventory: {
         lowStockCount: 2,
@@ -136,9 +141,11 @@ describe('DashboardService', () => {
 
     expect(prismaMock.serviceOrder.findMany).toHaveBeenCalledWith({
       where: {
-        status: 'ENTREGUE',
-        deliveredAt: {
-          gte: expect.any(Date),
+        financialEntries: {
+          some: {
+            type: 'RECEIVABLE',
+            status: 'PAGO',
+          },
         },
       },
       include: {
@@ -160,7 +167,8 @@ describe('DashboardService', () => {
                   not: null,
                 },
               },
-              include: {
+              select: {
+                quantity: true,
                 inventoryItem: {
                   select: {
                     cost: true,
@@ -172,9 +180,25 @@ describe('DashboardService', () => {
         },
       },
     });
+    expect(prismaMock.serviceOrderPart.aggregate).toHaveBeenCalledWith({
+      _sum: { totalPrice: true },
+      where: {
+        updatedAt: {
+          gte: expect.any(Date),
+          lt: expect.any(Date),
+        },
+        serviceOrder: {
+          financialEntries: {
+            none: {
+              type: 'RECEIVABLE',
+            },
+          },
+        },
+      },
+    });
   });
 
-  it('should sum stock output from both service order parts and linked budget inventory items on delivered orders', async () => {
+  it('should sum stock output from service order parts updated in the current month', async () => {
     prismaMock.serviceOrder.count
       .mockResolvedValueOnce(0)
       .mockResolvedValueOnce(0)
@@ -184,22 +208,18 @@ describe('DashboardService', () => {
     prismaMock.financialEntry.aggregate.mockResolvedValue({
       _sum: { amount: new Prisma.Decimal(0) },
     });
+    prismaMock.serviceOrderPart.aggregate.mockResolvedValue({
+      _sum: { totalPrice: new Prisma.Decimal(90) },
+    });
     prismaMock.serviceOrder.findMany.mockResolvedValue([
       {
-        parts: [
-          {
-            quantity: 2,
-            inventoryItem: {
-              cost: new Prisma.Decimal(15),
-            },
-          },
-        ],
+        parts: [],
         budget: {
           items: [
             {
-              quantity: 3,
+              quantity: 1,
               inventoryItem: {
-                cost: new Prisma.Decimal(20),
+                cost: new Prisma.Decimal(35),
               },
             },
           ],
@@ -209,6 +229,6 @@ describe('DashboardService', () => {
 
     const result = await service.getSummary();
 
-    expect(result.financial.stockOutValue).toEqual(new Prisma.Decimal(90));
+    expect(result.financial.stockOutValue).toEqual(new Prisma.Decimal(35));
   });
 });

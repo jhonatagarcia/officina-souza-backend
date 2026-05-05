@@ -20,18 +20,23 @@ export class AddServiceOrderPartUseCase {
     }
 
     return this.prisma.$transaction(async (tx) => {
-      await this.inventoryService.reserveOrConsumePart(
-        addPartDto.inventoryItemId,
-        addPartDto.quantity,
-        tx,
-      );
-
       const existingPart = await tx.serviceOrderPart.findFirst({
         where: {
           serviceOrderId,
           inventoryItemId: addPartDto.inventoryItemId,
         },
       });
+
+      await this.inventoryService.reserveOrConsumePart(
+        addPartDto.inventoryItemId,
+        addPartDto.quantity,
+        tx,
+        {
+          serviceOrderId,
+          serviceOrderPartId: existingPart?.id,
+          reason: `Saida de estoque por uso na ${serviceOrder.orderNumber}`,
+        },
+      );
 
       const nextQuantity = (existingPart?.quantity ?? 0) + addPartDto.quantity;
       const nextTotalPrice = nextQuantity * addPartDto.unitPrice;

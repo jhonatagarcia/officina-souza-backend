@@ -35,6 +35,12 @@ export class InventoryController {
     return this.inventoryService.getLowStockAlerts();
   }
 
+  @Get(':id/movements')
+  @Roles(Role.ADMIN, Role.ATENDENTE, Role.FINANCEIRO)
+  getMovements(@Param('id') id: string) {
+    return this.inventoryService.getMovements(id);
+  }
+
   @Get(':id')
   @Roles(Role.ADMIN, Role.ATENDENTE, Role.FINANCEIRO)
   findOne(@Param('id') id: string) {

@@ -91,8 +91,11 @@ describe('InventoryService', () => {
     const tx = {
       inventoryItem: {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-        findUniqueOrThrow: jest.fn().mockResolvedValue({ id: 'item-1', quantity: 7 }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue({ id: 'item-1', quantity: 7, cost: 10 }),
         findUnique: jest.fn(),
+      },
+      inventoryMovement: {
+        create: jest.fn(),
       },
     };
 
@@ -111,7 +114,17 @@ describe('InventoryService', () => {
         },
       },
     });
-    expect(result).toEqual({ id: 'item-1', quantity: 7 });
+    expect(result).toEqual({ id: 'item-1', quantity: 7, cost: 10 });
+    expect(tx.inventoryMovement.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          inventoryItemId: 'item-1',
+          quantityChange: -3,
+          quantityBefore: 10,
+          quantityAfter: 7,
+        }),
+      }),
+    );
   });
 
   it('should block reserve when quantity is zero or negative', async () => {

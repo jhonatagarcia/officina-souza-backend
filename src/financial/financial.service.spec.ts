@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { FinancialStatus } from '@prisma/client';
+import { FinancialStatus, Prisma } from '@prisma/client';
 import { ClientsService } from 'src/clients/clients.service';
 import { FinancialService } from 'src/financial/financial.service';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -17,6 +17,13 @@ describe('FinancialService', () => {
       updateMany: jest.fn(),
       findMany: jest.fn(),
       count: jest.fn(),
+      aggregate: jest.fn(),
+    },
+    serviceOrderPart: {
+      aggregate: jest.fn(),
+    },
+    serviceOrder: {
+      findMany: jest.fn(),
     },
     $transaction: jest.fn(),
   };
@@ -170,6 +177,121 @@ describe('FinancialService', () => {
         ],
         status: 'PENDENTE',
         type: 'RECEIVABLE',
+      },
+    });
+  });
+
+  it('should summarize receivables and stock output from service order parts', async () => {
+    prismaMock.financialEntry.aggregate.mockResolvedValue({
+      _sum: { amount: new Prisma.Decimal(450) },
+    });
+    prismaMock.serviceOrderPart.aggregate
+      .mockResolvedValueOnce({ _sum: { totalPrice: new Prisma.Decimal(100) } });
+    prismaMock.serviceOrder.findMany.mockResolvedValue([
+      {
+        parts: [
+          {
+            quantity: 2,
+            inventoryItem: {
+              cost: new Prisma.Decimal(40),
+            },
+          },
+          {
+            quantity: 1,
+            inventoryItem: {
+              cost: new Prisma.Decimal(20),
+            },
+          },
+        ],
+        budget: null,
+      },
+      {
+        parts: [],
+        budget: {
+          items: [
+            {
+              quantity: 1,
+              inventoryItem: {
+                cost: new Prisma.Decimal(35),
+              },
+            },
+          ],
+        },
+      },
+    ]);
+
+    const result = await service.getSummary();
+
+    expect(result).toEqual({
+      receivablesValue: new Prisma.Decimal(550),
+      stockOutValue: new Prisma.Decimal(135),
+    });
+    expect(prismaMock.financialEntry.aggregate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          type: 'RECEIVABLE',
+          dueDate: {
+            gte: expect.any(Date),
+            lt: expect.any(Date),
+          },
+        }),
+      }),
+    );
+    expect(prismaMock.serviceOrder.findMany).toHaveBeenCalledWith({
+      where: {
+        financialEntries: {
+          some: {
+            type: 'RECEIVABLE',
+            status: 'PAGO',
+          },
+        },
+      },
+      include: {
+        parts: {
+          select: {
+            quantity: true,
+            inventoryItem: {
+              select: {
+                cost: true,
+              },
+            },
+          },
+        },
+        budget: {
+          include: {
+            items: {
+              where: {
+                inventoryItemId: {
+                  not: null,
+                },
+              },
+              select: {
+                quantity: true,
+                inventoryItem: {
+                  select: {
+                    cost: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    expect(prismaMock.serviceOrderPart.aggregate).toHaveBeenCalledWith({
+      _sum: { totalPrice: true },
+      where: {
+        updatedAt: {
+          gte: expect.any(Date),
+          lt: expect.any(Date),
+        },
+        serviceOrder: {
+          financialEntries: {
+            none: {
+              type: 'RECEIVABLE',
+            },
+          },
+        },
       },
     });
   });

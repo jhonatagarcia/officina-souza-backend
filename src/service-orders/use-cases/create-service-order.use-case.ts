@@ -3,6 +3,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateServiceOrderDto } from 'src/service-orders/dto/create-service-order.dto';
 import { ServiceOrderReferenceValidatorService } from 'src/service-orders/services/service-order-reference-validator.service';
 import { buildServiceOrderNumber } from 'src/service-orders/utils/service-order-number.util';
+import { parseExpectedDeliveryAt } from 'src/service-orders/utils/expected-delivery-date.util';
 
 @Injectable()
 export class CreateServiceOrderUseCase {
@@ -29,9 +30,7 @@ export class CreateServiceOrderUseCase {
         diagnosis: createServiceOrderDto.diagnosis,
         servicesPerformed: createServiceOrderDto.servicesPerformed,
         vehicleChecklist: createServiceOrderDto.vehicleChecklist,
-        expectedDeliveryAt: createServiceOrderDto.expectedDeliveryAt
-          ? new Date(createServiceOrderDto.expectedDeliveryAt)
-          : undefined,
+        expectedDeliveryAt: parseExpectedDeliveryAt(createServiceOrderDto.expectedDeliveryAt),
         notes: createServiceOrderDto.notes,
       },
       include: { client: true, vehicle: true, mechanic: true },

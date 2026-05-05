@@ -38,7 +38,6 @@ export class ClientsService {
 
   async findAll(pagination: PaginationQueryDto): Promise<PaginatedResponse<ClientResponseDto>> {
     const where: Prisma.ClientWhereInput = {
-      isActive: true,
       ...(pagination.search
         ? {
             OR: [
@@ -72,8 +71,8 @@ export class ClientsService {
   }
 
   async findOne(id: string): Promise<ClientDetailResponseDto> {
-    const client = await this.prisma.client.findFirst({
-      where: { id, isActive: true },
+    const client = await this.prisma.client.findUnique({
+      where: { id },
       include: {
         vehicles: true,
       },

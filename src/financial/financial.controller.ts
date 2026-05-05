@@ -30,6 +30,13 @@ export class FinancialController {
     return this.financialService.findAll(pagination);
   }
 
+  @Get('summary')
+  @Roles(Role.ADMIN, Role.FINANCEIRO)
+  @ApiOperation({ summary: 'Resumo financeiro' })
+  getSummary() {
+    return this.financialService.getSummary();
+  }
+
   @Get(':id')
   @Roles(Role.ADMIN, Role.FINANCEIRO)
   findOne(@Param('id') id: string) {

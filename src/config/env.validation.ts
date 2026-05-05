@@ -80,6 +80,7 @@ class EnvironmentVariables {
   @IsOptional()
   @IsString()
   SEED_ADMIN_NAME?: string;
+
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvironmentVariables {

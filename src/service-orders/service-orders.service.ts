@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, ServiceOrderStatus } from '@prisma/client';
 import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
 import { buildPaginationMeta, PaginatedResponse } from 'src/common/utils/pagination.util';
@@ -21,6 +21,7 @@ import { ServiceOrderReferenceValidatorService } from 'src/service-orders/servic
 import { AddServiceOrderPartUseCase } from 'src/service-orders/use-cases/add-service-order-part.use-case';
 import { CreateServiceOrderUseCase } from 'src/service-orders/use-cases/create-service-order.use-case';
 import { UpdateServiceOrderStatusUseCase } from 'src/service-orders/use-cases/update-service-order-status.use-case';
+import { parseExpectedDeliveryAt } from 'src/service-orders/utils/expected-delivery-date.util';
 
 const SERVICE_ORDER_ORDERABLE_FIELDS = new Set([
   'orderNumber',
@@ -149,7 +150,7 @@ export class ServiceOrdersService {
     }
 
     if ('expectedDeliveryAt' in updateServiceOrderDto) {
-      updateData.expectedDeliveryAt = this.parseExpectedDeliveryAt(
+      updateData.expectedDeliveryAt = parseExpectedDeliveryAt(
         updateServiceOrderDto.expectedDeliveryAt,
       );
     }
@@ -204,32 +205,4 @@ export class ServiceOrdersService {
     return serviceOrder;
   }
 
-  private parseExpectedDeliveryAt(value: string | null | undefined): Date | null | undefined {
-    if (value === undefined) {
-      return undefined;
-    }
-
-    if (value === null) {
-      return null;
-    }
-
-    if (!/^\d{4}-/.test(value)) {
-      throw new BadRequestException('A previsao de entrega deve informar um ano com 4 digitos');
-    }
-
-    const expectedDeliveryAt = new Date(value);
-
-    if (Number.isNaN(expectedDeliveryAt.getTime())) {
-      throw new BadRequestException('A previsao de entrega deve ser uma data valida');
-    }
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    if (expectedDeliveryAt < today) {
-      throw new BadRequestException('A previsao de entrega nao pode ser anterior ao dia atual');
-    }
-
-    return expectedDeliveryAt;
-  }
 }

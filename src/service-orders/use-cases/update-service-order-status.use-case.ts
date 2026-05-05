@@ -1,5 +1,11 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { FinancialEntryType, FinancialStatus, Prisma, ServiceOrderStatus } from '@prisma/client';
+import {
+  FinancialEntryType,
+  FinancialStatus,
+  InventoryMovementType,
+  Prisma,
+  ServiceOrderStatus,
+} from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { UpdateServiceOrderStatusDto } from 'src/service-orders/dto/update-service-order-status.dto';
 
@@ -30,11 +36,15 @@ export class UpdateServiceOrderStatusUseCase {
       updateData.deliveredAt = new Date();
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const updatedServiceOrder = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.serviceOrder.update({
         where: { id },
         data: updateData,
       });
+
+      if (updateStatusDto.status === ServiceOrderStatus.FINALIZADA && updated.budgetId) {
+        await this.consumeBudgetInventoryItems(updated.id, tx);
+      }
 
       if (updateStatusDto.status === ServiceOrderStatus.FINALIZADA) {
         await this.registerHistory(updated.id, tx);
@@ -46,6 +56,8 @@ export class UpdateServiceOrderStatusUseCase {
 
       return updated;
     });
+
+    return updatedServiceOrder;
   }
 
   private assertStatusTransition(
@@ -128,6 +140,89 @@ export class UpdateServiceOrderStatusUseCase {
         totalAmount: serviceOrder.budget?.total ?? null,
       },
     });
+  }
+
+  private async consumeBudgetInventoryItems(
+    serviceOrderId: string,
+    tx: Prisma.TransactionClient,
+  ) {
+    const serviceOrder = await tx.serviceOrder.findUnique({
+      where: { id: serviceOrderId },
+      include: {
+        parts: true,
+        budget: {
+          include: {
+            items: {
+              where: {
+                inventoryItemId: { not: null },
+              },
+              include: {
+                inventoryItem: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!serviceOrder?.budget?.items?.length) {
+      return;
+    }
+
+    const existingInventoryItemIds = new Set(
+      serviceOrder.parts.map((part) => part.inventoryItemId),
+    );
+
+    for (const item of serviceOrder.budget.items) {
+      if (!item.inventoryItemId || existingInventoryItemIds.has(item.inventoryItemId)) {
+        continue;
+      }
+
+      const result = await tx.inventoryItem.updateMany({
+        where: {
+          id: item.inventoryItemId,
+          quantity: { gte: item.quantity },
+        },
+        data: {
+          quantity: {
+            decrement: item.quantity,
+          },
+        },
+      });
+
+      if (result.count === 0) {
+        throw new BadRequestException('Quantidade insuficiente em estoque');
+      }
+
+      const updatedInventoryItem = await tx.inventoryItem.findUniqueOrThrow({
+        where: { id: item.inventoryItemId },
+      });
+
+      const serviceOrderPart = await tx.serviceOrderPart.create({
+        data: {
+          serviceOrderId,
+          inventoryItemId: item.inventoryItemId,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          totalPrice: item.totalPrice,
+        },
+      });
+
+      await tx.inventoryMovement.create({
+        data: {
+          inventoryItemId: item.inventoryItemId,
+          serviceOrderId,
+          serviceOrderPartId: serviceOrderPart.id,
+          type: InventoryMovementType.OUT,
+          quantityChange: -item.quantity,
+          quantityBefore: updatedInventoryItem.quantity + item.quantity,
+          quantityAfter: updatedInventoryItem.quantity,
+          unitCost: updatedInventoryItem.cost,
+          totalCost: new Prisma.Decimal(updatedInventoryItem.cost).mul(item.quantity),
+          reason: `Saida de estoque por uso na ${serviceOrder.orderNumber}`,
+        },
+      });
+    }
   }
 
   private async createReceivableEntry(serviceOrderId: string, tx: Prisma.TransactionClient) {
