@@ -65,32 +65,13 @@ npm run prisma:generate
 
 ## Configuração do ambiente
 
-O projeto carrega variáveis a partir de `.env`. Atualmente não há um `.env.example` versionado, então crie o arquivo `.env` na raiz do backend usando as variáveis abaixo como referência.
+O projeto carrega variáveis a partir de `.env`. Use `.env.example` como base para criar o arquivo local:
 
-Exemplo para desenvolvimento local:
-
-```env
-NODE_ENV=development
-PORT=3000
-APP_NAME=Oficina Backend API
-APP_VERSION=1.0.0
-API_PREFIX=api
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/oficina_db?schema=public
-JWT_SECRET=change-this-local-secret-with-at-least-32-characters
-JWT_EXPIRES_IN=15m
-JWT_ISSUER=oficina-backend-api
-JWT_AUDIENCE=oficina-web
-BCRYPT_SALT_ROUNDS=12
-CORS_ORIGIN=http://localhost:3000,http://localhost:5173
-CORS_CREDENTIALS=false
-THROTTLE_TTL=60
-THROTTLE_LIMIT=100
-LOG_LEVEL=debug
-ENABLE_SWAGGER=true
-SEED_ADMIN_EMAIL=admin@example.com
-SEED_ADMIN_PASSWORD=admin123456
-SEED_ADMIN_NAME=Admin
+```bash
+cp .env.example .env
 ```
+
+O arquivo `.env` real não deve ser versionado. Ele pode conter credenciais, segredos e dados específicos do ambiente. O `.env.example` deve manter apenas placeholders seguros.
 
 Variáveis obrigatórias validadas na inicialização:
 
