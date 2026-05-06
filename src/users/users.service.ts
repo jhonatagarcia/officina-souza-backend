@@ -8,8 +8,9 @@ import { ConfigService } from '@nestjs/config';
 import { Prisma, User } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
-import { buildPaginationMeta, PaginatedResponse } from 'src/common/utils/pagination.util';
 import { Role } from 'src/common/enums/role.enum';
+import { buildSafeOrderBy } from 'src/common/utils/order-by.util';
+import { buildPaginationMeta, PaginatedResponse } from 'src/common/utils/pagination.util';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateMechanicDto } from 'src/users/dto/create-mechanic.dto';
 import { CreateUserDto } from 'src/users/dto/create-user.dto';
@@ -18,7 +19,14 @@ import { UpdateMechanicDto } from 'src/users/dto/update-mechanic.dto';
 import { UpdateUserDto } from 'src/users/dto/update-user.dto';
 import { UserResponseDto, toUserResponseDto } from 'src/users/dto/user-response.dto';
 
-const USER_ORDERABLE_FIELDS = new Set(['name', 'email', 'role', 'createdAt', 'updatedAt', 'lastLoginAt']);
+const USER_ORDERABLE_FIELDS = new Set([
+  'name',
+  'email',
+  'role',
+  'createdAt',
+  'updatedAt',
+  'lastLoginAt',
+] as const);
 
 @Injectable()
 export class UsersService {
@@ -68,14 +76,17 @@ export class UsersService {
         : {}),
     };
 
-    const sortBy = USER_ORDERABLE_FIELDS.has(query.sortBy ?? '') ? (query.sortBy ?? 'createdAt') : 'createdAt';
-
     const [data, total] = await this.prisma.$transaction([
       this.prisma.user.findMany({
         where,
         skip: (query.page - 1) * query.limit,
         take: query.limit,
-        orderBy: { [sortBy]: query.sortOrder },
+        orderBy: buildSafeOrderBy(
+          USER_ORDERABLE_FIELDS,
+          query.sortBy,
+          'createdAt',
+          query.sortOrder,
+        ),
       }),
       this.prisma.user.count({ where }),
     ]);
@@ -168,7 +179,10 @@ export class UsersService {
     });
   }
 
-  async updateMechanic(id: string, updateMechanicDto: UpdateMechanicDto): Promise<Omit<User, 'passwordHash'>> {
+  async updateMechanic(
+    id: string,
+    updateMechanicDto: UpdateMechanicDto,
+  ): Promise<Omit<User, 'passwordHash'>> {
     const mechanic = await this.findMechanicById(id);
 
     return this.update(mechanic.id, {
@@ -205,13 +219,14 @@ export class UsersService {
   }
 
   private async generateMechanicEmail(name: string) {
-    const normalizedName = name
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '.')
-      .replace(/^\.+|\.+$/g, '')
-      .slice(0, 40) || 'mecanico';
+    const normalizedName =
+      name
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '.')
+        .replace(/^\.+|\.+$/g, '')
+        .slice(0, 40) || 'mecanico';
 
     let suffix = Date.now();
 

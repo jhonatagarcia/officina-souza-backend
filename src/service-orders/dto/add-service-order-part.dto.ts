@@ -1,9 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNumber, IsString, Min } from 'class-validator';
+import { IsNumber, IsUUID, Min } from 'class-validator';
 
 export class AddServiceOrderPartDto {
   @ApiProperty()
-  @IsString()
+  @IsUUID()
   inventoryItemId!: string;
 
   @ApiProperty()

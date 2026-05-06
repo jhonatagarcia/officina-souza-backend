@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ClientsModule } from 'src/clients/clients.module';
 import { BudgetsController } from 'src/budgets/budgets.controller';
+import { BudgetItemReferenceService } from 'src/budgets/services/budget-item-reference.service';
 import { BudgetReaderService } from 'src/budgets/services/budget-reader.service';
 import { BudgetReferenceValidatorService } from 'src/budgets/services/budget-reference-validator.service';
 import { BudgetTotalsService } from 'src/budgets/services/budget-totals.service';
@@ -16,6 +17,7 @@ import { VehiclesModule } from 'src/vehicles/vehicles.module';
   controllers: [BudgetsController],
   providers: [
     BudgetsService,
+    BudgetItemReferenceService,
     BudgetReaderService,
     BudgetReferenceValidatorService,
     BudgetTotalsService,

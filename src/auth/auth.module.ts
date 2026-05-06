@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import type { StringValue } from 'ms';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
@@ -16,7 +17,9 @@ import { UsersModule } from 'src/users/users.module';
       useFactory: (configService: ConfigService) => ({
         secret: configService.getOrThrow<string>('auth.jwtSecret'),
         signOptions: {
-          expiresIn: configService.getOrThrow<string>('auth.jwtExpiresIn') as never,
+          expiresIn: configService.getOrThrow<StringValue>('auth.jwtExpiresIn'),
+          issuer: configService.getOrThrow<string>('auth.jwtIssuer'),
+          audience: configService.getOrThrow<string>('auth.jwtAudience'),
         },
       }),
     }),

@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { BudgetsService } from 'src/budgets/budgets.service';
@@ -31,25 +41,25 @@ export class BudgetsController {
 
   @Get(':id')
   @Roles(Role.ADMIN, Role.ATENDENTE, Role.FINANCEIRO)
-  findOne(@Param('id') id: string) {
+  findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.budgetsService.findOne(id);
   }
 
   @Patch(':id')
   @Roles(Role.ADMIN, Role.ATENDENTE)
-  update(@Param('id') id: string, @Body() updateBudgetDto: UpdateBudgetDto) {
+  update(@Param('id', ParseUUIDPipe) id: string, @Body() updateBudgetDto: UpdateBudgetDto) {
     return this.budgetsService.update(id, updateBudgetDto);
   }
 
   @Patch(':id/approve')
   @Roles(Role.ADMIN, Role.ATENDENTE)
-  approve(@Param('id') id: string) {
+  approve(@Param('id', ParseUUIDPipe) id: string) {
     return this.budgetsService.approve(id);
   }
 
   @Patch(':id/reject')
   @Roles(Role.ADMIN, Role.ATENDENTE)
-  reject(@Param('id') id: string) {
+  reject(@Param('id', ParseUUIDPipe) id: string) {
     return this.budgetsService.reject(id);
   }
 }

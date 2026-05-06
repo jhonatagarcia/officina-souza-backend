@@ -1,12 +1,12 @@
 import { Prisma } from '@prisma/client';
 
-export interface FinancialClientSummaryDto {
+interface FinancialClientSummaryDto {
   id: string;
   name: string;
   document: string | null;
 }
 
-export interface FinancialServiceOrderSummaryDto {
+interface FinancialServiceOrderSummaryDto {
   id: string;
   orderNumber: string;
   status: string;
@@ -35,9 +35,7 @@ type FinancialEntryModel = Prisma.FinancialEntryGetPayload<{
   include: { client: true; serviceOrder: true };
 }>;
 
-export function toFinancialEntryResponseDto(
-  entry: FinancialEntryModel,
-): FinancialEntryResponseDto {
+export function toFinancialEntryResponseDto(entry: FinancialEntryModel): FinancialEntryResponseDto {
   return {
     id: entry.id,
     type: entry.type,

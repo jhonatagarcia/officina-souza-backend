@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import { FinancialStatus, Prisma } from '@prisma/client';
 import { ClientsService } from 'src/clients/clients.service';
 import { FinancialService } from 'src/financial/financial.service';
+import { StockOutValueService } from 'src/financial/services/stock-out-value.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ServiceOrdersService } from 'src/service-orders/service-orders.service';
 
@@ -38,6 +39,7 @@ describe('FinancialService', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         FinancialService,
+        StockOutValueService,
         { provide: PrismaService, useValue: prismaMock },
         { provide: ClientsService, useValue: clientsServiceMock },
         { provide: ServiceOrdersService, useValue: serviceOrdersServiceMock },
@@ -48,7 +50,10 @@ describe('FinancialService', () => {
   });
 
   it('should create overdue entry with VENCIDO status automatically', async () => {
-    prismaMock.financialEntry.create.mockResolvedValue({ id: 'fin-1', status: FinancialStatus.VENCIDO });
+    prismaMock.financialEntry.create.mockResolvedValue({
+      id: 'fin-1',
+      status: FinancialStatus.VENCIDO,
+    });
 
     await service.create({
       type: 'RECEIVABLE',
@@ -63,28 +68,31 @@ describe('FinancialService', () => {
         data: expect.objectContaining({
           status: FinancialStatus.VENCIDO,
           dueDate: new Date('2020-01-01T00:00:00.000Z'),
-        }),
+        }) as { status: FinancialStatus; dueDate: Date },
       }),
     );
   });
 
-  it('should keep explicit status when provided on creation', async () => {
-    prismaMock.financialEntry.create.mockResolvedValue({ id: 'fin-1', status: FinancialStatus.PENDENTE });
+  it('should ignore residual status when provided on creation', async () => {
+    prismaMock.financialEntry.create.mockResolvedValue({
+      id: 'fin-1',
+      status: FinancialStatus.VENCIDO,
+    });
 
     await service.create({
       type: 'RECEIVABLE',
-      description: 'Cobrança',
+      description: 'Cobranca',
       category: 'Servico',
       amount: 150,
       dueDate: '2020-01-01T00:00:00.000Z',
-      status: 'PENDENTE',
-    });
+      status: FinancialStatus.PENDENTE,
+    } as Parameters<FinancialService['create']>[0] & { status: FinancialStatus });
 
     expect(prismaMock.financialEntry.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          status: FinancialStatus.PENDENTE,
-        }),
+          status: FinancialStatus.VENCIDO,
+        }) as { status: FinancialStatus },
       }),
     );
   });
@@ -139,7 +147,7 @@ describe('FinancialService', () => {
         data: expect.objectContaining({
           dueDate: new Date('2030-01-01T00:00:00.000Z'),
           status: FinancialStatus.PENDENTE,
-        }),
+        }) as { dueDate: Date; status: FinancialStatus },
       }),
     );
   });
@@ -185,8 +193,9 @@ describe('FinancialService', () => {
     prismaMock.financialEntry.aggregate.mockResolvedValue({
       _sum: { amount: new Prisma.Decimal(450) },
     });
-    prismaMock.serviceOrderPart.aggregate
-      .mockResolvedValueOnce({ _sum: { totalPrice: new Prisma.Decimal(100) } });
+    prismaMock.serviceOrderPart.aggregate.mockResolvedValueOnce({
+      _sum: { totalPrice: new Prisma.Decimal(100) },
+    });
     prismaMock.serviceOrder.findMany.mockResolvedValue([
       {
         parts: [
@@ -231,10 +240,10 @@ describe('FinancialService', () => {
         where: expect.objectContaining({
           type: 'RECEIVABLE',
           dueDate: {
-            gte: expect.any(Date),
-            lt: expect.any(Date),
+            gte: expect.any(Date) as Date,
+            lt: expect.any(Date) as Date,
           },
-        }),
+        }) as { type: string; dueDate: { gte: Date; lt: Date } },
       }),
     );
     expect(prismaMock.serviceOrder.findMany).toHaveBeenCalledWith({
@@ -282,8 +291,8 @@ describe('FinancialService', () => {
       _sum: { totalPrice: true },
       where: {
         updatedAt: {
-          gte: expect.any(Date),
-          lt: expect.any(Date),
+          gte: expect.any(Date) as Date,
+          lt: expect.any(Date) as Date,
         },
         serviceOrder: {
           financialEntries: {
@@ -315,7 +324,7 @@ describe('FinancialService', () => {
         data: expect.objectContaining({
           dueDate: new Date('2030-01-01T00:00:00.000Z'),
           status: FinancialStatus.PENDENTE,
-        }),
+        }) as { dueDate: Date; status: FinancialStatus },
       }),
     );
   });

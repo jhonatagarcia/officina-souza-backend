@@ -2,6 +2,8 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { FinancialEntryType, FinancialStatus, Prisma } from '@prisma/client';
 import { ClientsService } from 'src/clients/clients.service';
 import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
+import { getCurrentMonthRange } from 'src/common/utils/date-period.util';
+import { buildSafeOrderBy } from 'src/common/utils/order-by.util';
 import { buildPaginationMeta, PaginatedResponse } from 'src/common/utils/pagination.util';
 import {
   FinancialEntryResponseDto,
@@ -11,9 +13,10 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { ServiceOrdersService } from 'src/service-orders/service-orders.service';
 import { CreateFinancialEntryDto } from 'src/financial/dto/create-financial-entry.dto';
 import { PayFinancialEntryDto } from 'src/financial/dto/pay-financial-entry.dto';
+import { StockOutValueService } from 'src/financial/services/stock-out-value.service';
 import { UpdateFinancialEntryDto } from 'src/financial/dto/update-financial-entry.dto';
 
-const FINANCIAL_ORDERABLE_FIELDS = new Set(['dueDate', 'createdAt', 'amount', 'status']);
+const FINANCIAL_ORDERABLE_FIELDS = new Set(['dueDate', 'createdAt', 'amount', 'status'] as const);
 
 @Injectable()
 export class FinancialService {
@@ -21,6 +24,7 @@ export class FinancialService {
     private readonly prisma: PrismaService,
     private readonly clientsService: ClientsService,
     private readonly serviceOrdersService: ServiceOrdersService,
+    private readonly stockOutValueService: StockOutValueService,
   ) {}
 
   async create(
@@ -32,13 +36,18 @@ export class FinancialService {
     );
 
     const dueDate = new Date(createFinancialEntryDto.dueDate);
-    const status =
-      createFinancialEntryDto.status ??
-      (dueDate < new Date() ? FinancialStatus.VENCIDO : FinancialStatus.PENDENTE);
+    const status = dueDate < new Date() ? FinancialStatus.VENCIDO : FinancialStatus.PENDENTE;
 
     const entry = await this.prisma.financialEntry.create({
       data: {
-        ...createFinancialEntryDto,
+        type: createFinancialEntryDto.type,
+        description: createFinancialEntryDto.description,
+        category: createFinancialEntryDto.category,
+        amount: createFinancialEntryDto.amount,
+        paymentMethod: createFinancialEntryDto.paymentMethod,
+        clientId: createFinancialEntryDto.clientId,
+        serviceOrderId: createFinancialEntryDto.serviceOrderId,
+        notes: createFinancialEntryDto.notes,
         dueDate,
         status,
       },
@@ -66,16 +75,17 @@ export class FinancialService {
       ...(pagination.type ? { type: pagination.type as FinancialEntryType } : {}),
     };
 
-    const sortBy = FINANCIAL_ORDERABLE_FIELDS.has(pagination.sortBy ?? '')
-      ? (pagination.sortBy ?? 'createdAt')
-      : 'createdAt';
-
     const [data, total] = await this.prisma.$transaction([
       this.prisma.financialEntry.findMany({
         where,
         skip: (pagination.page - 1) * pagination.limit,
         take: pagination.limit,
-        orderBy: { [sortBy]: pagination.sortOrder },
+        orderBy: buildSafeOrderBy(
+          FINANCIAL_ORDERABLE_FIELDS,
+          pagination.sortBy,
+          'createdAt',
+          pagination.sortOrder,
+        ),
         include: {
           client: true,
           serviceOrder: true,
@@ -106,18 +116,14 @@ export class FinancialService {
   }
 
   async getSummary() {
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0, 0, 0, 0);
-    const startOfNextMonth = new Date(startOfMonth);
-    startOfNextMonth.setMonth(startOfNextMonth.getMonth() + 1);
+    const currentMonth = getCurrentMonthRange();
 
     const [receivablesSummary, paidServiceOrders, unbilledPartsSummary] = await Promise.all([
       this.prisma.financialEntry.aggregate({
         _sum: { amount: true },
         where: {
           type: FinancialEntryType.RECEIVABLE,
-          dueDate: { gte: startOfMonth, lt: startOfNextMonth },
+          dueDate: { gte: currentMonth.start, lt: currentMonth.end },
         },
       }),
       this.prisma.serviceOrder.findMany({
@@ -164,7 +170,7 @@ export class FinancialService {
       this.prisma.serviceOrderPart.aggregate({
         _sum: { totalPrice: true },
         where: {
-          updatedAt: { gte: startOfMonth, lt: startOfNextMonth },
+          updatedAt: { gte: currentMonth.start, lt: currentMonth.end },
           serviceOrder: {
             financialEntries: {
               none: {
@@ -179,27 +185,7 @@ export class FinancialService {
     const receivablesValue = new Prisma.Decimal(receivablesSummary._sum.amount ?? 0).add(
       unbilledPartsSummary._sum.totalPrice ?? 0,
     );
-    const stockOutValue = paidServiceOrders.reduce((ordersTotal, serviceOrder) => {
-      if (serviceOrder.parts.length > 0) {
-        return ordersTotal.add(
-          serviceOrder.parts.reduce(
-            (partsTotal, part) =>
-              partsTotal.add(new Prisma.Decimal(part.inventoryItem.cost).mul(part.quantity)),
-            new Prisma.Decimal(0),
-          ),
-        );
-      }
-
-      return ordersTotal.add(
-        (serviceOrder.budget?.items ?? []).reduce(
-          (itemsTotal, item) =>
-            item.inventoryItem
-              ? itemsTotal.add(new Prisma.Decimal(item.inventoryItem.cost).mul(item.quantity))
-              : itemsTotal,
-          new Prisma.Decimal(0),
-        ),
-      );
-    }, new Prisma.Decimal(0));
+    const stockOutValue = this.stockOutValueService.calculateFromServiceOrders(paidServiceOrders);
 
     return {
       receivablesValue,
@@ -234,7 +220,14 @@ export class FinancialService {
     const updated = await this.prisma.financialEntry.update({
       where: { id },
       data: {
-        ...updateFinancialEntryDto,
+        type: updateFinancialEntryDto.type,
+        description: updateFinancialEntryDto.description,
+        category: updateFinancialEntryDto.category,
+        amount: updateFinancialEntryDto.amount,
+        paymentMethod: updateFinancialEntryDto.paymentMethod,
+        clientId: updateFinancialEntryDto.clientId,
+        serviceOrderId: updateFinancialEntryDto.serviceOrderId,
+        notes: updateFinancialEntryDto.notes,
         dueDate: updateFinancialEntryDto.dueDate
           ? new Date(updateFinancialEntryDto.dueDate)
           : undefined,
@@ -282,10 +275,7 @@ export class FinancialService {
     return toFinancialEntryResponseDto(updated);
   }
 
-  private async validateReferences(
-    clientId?: string,
-    serviceOrderId?: string,
-  ) {
+  private async validateReferences(clientId?: string, serviceOrderId?: string) {
     const [client, serviceOrder] = await Promise.all([
       clientId ? this.clientsService.ensureExists(clientId) : Promise.resolve(null),
       serviceOrderId

@@ -47,11 +47,11 @@ class CreateBudgetItemDto {
 
 export class CreateBudgetDto {
   @ApiProperty()
-  @IsString()
+  @IsUUID()
   clientId!: string;
 
   @ApiProperty()
-  @IsString()
+  @IsUUID()
   vehicleId!: string;
 
   @ApiProperty()

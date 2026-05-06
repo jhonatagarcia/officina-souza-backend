@@ -30,8 +30,15 @@ export class VehiclesService {
 
     const vehicle = await this.prisma.vehicle.create({
       data: {
-        ...createVehicleDto,
+        clientId: createVehicleDto.clientId,
         plate: createVehicleDto.plate.toUpperCase(),
+        brand: createVehicleDto.brand,
+        model: createVehicleDto.model,
+        year: createVehicleDto.year,
+        color: createVehicleDto.color,
+        mileage: createVehicleDto.mileage,
+        fuel: createVehicleDto.fuel,
+        notes: createVehicleDto.notes,
       },
     });
 
@@ -97,14 +104,25 @@ export class VehiclesService {
       await this.clientsService.ensureExists(updateVehicleDto.clientId);
     }
 
-    if (updateVehicleDto.plate) {
-      await this.ensureUniquePlate(updateVehicleDto.plate, id);
-      updateVehicleDto.plate = updateVehicleDto.plate.toUpperCase();
+    const plate = updateVehicleDto.plate?.toUpperCase();
+
+    if (plate) {
+      await this.ensureUniquePlate(plate, id);
     }
 
     const vehicle = await this.prisma.vehicle.update({
       where: { id },
-      data: updateVehicleDto,
+      data: {
+        clientId: updateVehicleDto.clientId,
+        plate,
+        brand: updateVehicleDto.brand,
+        model: updateVehicleDto.model,
+        year: updateVehicleDto.year,
+        color: updateVehicleDto.color,
+        mileage: updateVehicleDto.mileage,
+        fuel: updateVehicleDto.fuel,
+        notes: updateVehicleDto.notes,
+      },
     });
 
     return toVehicleResponseDto(vehicle);

@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
 
-export interface BudgetItemResponseDto {
+interface BudgetItemResponseDto {
   id: string;
   budgetId: string;
   type: string;
@@ -15,13 +15,13 @@ export interface BudgetItemResponseDto {
   updatedAt: Date;
 }
 
-export interface BudgetClientSummaryDto {
+interface BudgetClientSummaryDto {
   id: string;
   name: string;
   document: string | null;
 }
 
-export interface BudgetVehicleSummaryDto {
+interface BudgetVehicleSummaryDto {
   id: string;
   plate: string;
   brand: string;
@@ -29,7 +29,7 @@ export interface BudgetVehicleSummaryDto {
   year: number;
 }
 
-export interface BudgetServiceOrderSummaryDto {
+interface BudgetServiceOrderSummaryDto {
   id: string;
   orderNumber: string;
   status: string;
@@ -62,14 +62,16 @@ export interface BudgetDetailResponseDto extends BudgetResponseDto {
 }
 
 type BudgetItemModel = Prisma.BudgetItemGetPayload<Record<string, never>>;
-type BudgetWithItemsModel = Prisma.BudgetGetPayload<{
-  include: { items: true };
-}> | (Prisma.BudgetGetPayload<Record<string, never>> & { items?: BudgetItemModel[] });
+type BudgetWithItemsModel =
+  | Prisma.BudgetGetPayload<{
+      include: { items: true };
+    }>
+  | (Prisma.BudgetGetPayload<Record<string, never>> & { items?: BudgetItemModel[] });
 type BudgetWithRelationsModel = Prisma.BudgetGetPayload<{
   include: { client: true; vehicle: true; items: true; serviceOrder: true };
 }>;
 
-export function toBudgetItemResponseDto(item: BudgetItemModel): BudgetItemResponseDto {
+function toBudgetItemResponseDto(item: BudgetItemModel): BudgetItemResponseDto {
   return {
     id: item.id,
     budgetId: item.budgetId,
@@ -107,7 +109,9 @@ export function toBudgetResponseDto(budget: BudgetWithItemsModel): BudgetRespons
   };
 }
 
-export function toBudgetDetailResponseDto(budget: BudgetWithRelationsModel): BudgetDetailResponseDto {
+export function toBudgetDetailResponseDto(
+  budget: BudgetWithRelationsModel,
+): BudgetDetailResponseDto {
   return {
     ...toBudgetResponseDto(budget),
     client: {

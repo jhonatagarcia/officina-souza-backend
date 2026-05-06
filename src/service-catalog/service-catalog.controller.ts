@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
@@ -31,14 +41,14 @@ export class ServiceCatalogController {
 
   @Get(':id')
   @Roles(Role.ADMIN, Role.ATENDENTE, Role.MECANICO, Role.FINANCEIRO)
-  findOne(@Param('id') id: string) {
+  findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.serviceCatalogService.findOne(id);
   }
 
   @Patch(':id')
   @Roles(Role.ADMIN, Role.ATENDENTE)
   update(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() updateServiceCatalogItemDto: UpdateServiceCatalogItemDto,
   ) {
     return this.serviceCatalogService.update(id, updateServiceCatalogItemDto);
@@ -46,13 +56,13 @@ export class ServiceCatalogController {
 
   @Patch(':id/activate')
   @Roles(Role.ADMIN, Role.ATENDENTE)
-  activate(@Param('id') id: string) {
+  activate(@Param('id', ParseUUIDPipe) id: string) {
     return this.serviceCatalogService.activate(id);
   }
 
   @Patch(':id/deactivate')
   @Roles(Role.ADMIN, Role.ATENDENTE)
-  deactivate(@Param('id') id: string) {
+  deactivate(@Param('id', ParseUUIDPipe) id: string) {
     return this.serviceCatalogService.deactivate(id);
   }
 }

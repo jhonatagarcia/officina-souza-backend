@@ -59,8 +59,8 @@ describe('ServiceOrdersService', () => {
   const usersServiceMock = { findById: jest.fn() };
   beforeEach(async () => {
     jest.clearAllMocks();
-    prismaMock.$transaction.mockImplementation(async (callback: (tx: typeof prismaMock) => unknown) =>
-      callback(prismaMock),
+    prismaMock.$transaction.mockImplementation(
+      async (callback: (tx: typeof prismaMock) => unknown) => callback(prismaMock),
     );
     prismaMock.serviceOrder.findMany.mockResolvedValue([]);
 
@@ -128,9 +128,7 @@ describe('ServiceOrdersService', () => {
   });
 
   it('should not call external WhatsApp API when status is unchanged', async () => {
-    const fetchMock = jest
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue({ ok: true } as Response);
+    const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true } as Response);
     prismaMock.serviceOrder.findUnique.mockResolvedValueOnce({
       id: 'os-1',
       status: ServiceOrderStatus.EM_ANDAMENTO,
@@ -210,7 +208,7 @@ describe('ServiceOrdersService', () => {
         type: 'RECEIVABLE',
         description: 'Cobranca da OS-123',
         category: 'Ordem de Servico',
-        amount: expect.any(Object),
+        amount: expect.any(Object) as Prisma.Decimal,
         dueDate: deliveredAt,
         status: 'PENDENTE',
         clientId: 'client-1',
@@ -277,7 +275,7 @@ describe('ServiceOrdersService', () => {
         type: 'RECEIVABLE',
         description: 'Cobranca da OS-123',
         category: 'Ordem de Servico',
-        amount: expect.any(Prisma.Decimal),
+        amount: expect.any(Prisma.Decimal) as Prisma.Decimal,
         dueDate: deliveredAt,
         status: 'PENDENTE',
         clientId: 'client-1',
@@ -306,7 +304,7 @@ describe('ServiceOrdersService', () => {
         where: { id: 'os-1' },
         data: expect.objectContaining({
           expectedDeliveryAt: new Date('2030-01-02T12:00:00.000Z'),
-        }),
+        }) as { expectedDeliveryAt: Date },
       }),
     );
   });
@@ -330,7 +328,7 @@ describe('ServiceOrdersService', () => {
         where: { id: 'os-1' },
         data: expect.objectContaining({
           expectedDeliveryAt: new Date('2030-01-02T12:00:00.000Z'),
-        }),
+        }) as { expectedDeliveryAt: Date },
       }),
     );
   });
@@ -354,7 +352,7 @@ describe('ServiceOrdersService', () => {
         where: { id: 'os-1' },
         data: expect.objectContaining({
           expectedDeliveryAt: null,
-        }),
+        }) as { expectedDeliveryAt: null },
       }),
     );
   });

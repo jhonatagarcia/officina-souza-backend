@@ -142,10 +142,7 @@ export class UpdateServiceOrderStatusUseCase {
     });
   }
 
-  private async consumeBudgetInventoryItems(
-    serviceOrderId: string,
-    tx: Prisma.TransactionClient,
-  ) {
+  private async consumeBudgetInventoryItems(serviceOrderId: string, tx: Prisma.TransactionClient) {
     const serviceOrder = await tx.serviceOrder.findUnique({
       where: { id: serviceOrderId },
       include: {
@@ -253,7 +250,10 @@ export class UpdateServiceOrderStatusUseCase {
 
     const amount =
       serviceOrder.budget?.total ??
-      serviceOrder.parts.reduce((total, part) => total.plus(part.totalPrice), new Prisma.Decimal(0));
+      serviceOrder.parts.reduce(
+        (total, part) => total.plus(part.totalPrice),
+        new Prisma.Decimal(0),
+      );
 
     if (!amount || amount.lte(0)) {
       return;

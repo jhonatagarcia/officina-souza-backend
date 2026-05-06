@@ -1,18 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { FinancialEntryType, FinancialStatus, Prisma, ServiceOrderStatus } from '@prisma/client';
+import { getCurrentMonthRange } from 'src/common/utils/date-period.util';
+import { StockOutValueService } from 'src/financial/services/stock-out-value.service';
 import { isLowStock } from 'src/inventory/utils/inventory-stock-status.util';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 @Injectable()
 export class DashboardService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly stockOutValueService: StockOutValueService,
+  ) {}
 
   async getSummary() {
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0, 0, 0, 0);
-    const startOfNextMonth = new Date(startOfMonth);
-    startOfNextMonth.setMonth(startOfNextMonth.getMonth() + 1);
+    const currentMonth = getCurrentMonthRange();
 
     const [
       openOrders,
@@ -35,7 +36,7 @@ export class DashboardService {
         _sum: { amount: true },
         where: {
           type: FinancialEntryType.RECEIVABLE,
-          dueDate: { gte: startOfMonth, lt: startOfNextMonth },
+          dueDate: { gte: currentMonth.start, lt: currentMonth.end },
         },
       }),
       this.prisma.serviceOrder.findMany({
@@ -82,7 +83,7 @@ export class DashboardService {
       this.prisma.serviceOrderPart.aggregate({
         _sum: { totalPrice: true },
         where: {
-          updatedAt: { gte: startOfMonth, lt: startOfNextMonth },
+          updatedAt: { gte: currentMonth.start, lt: currentMonth.end },
           serviceOrder: {
             financialEntries: {
               none: {
@@ -100,27 +101,7 @@ export class DashboardService {
     const monthRevenue = new Prisma.Decimal(financialSummary._sum.amount ?? 0).add(
       unbilledPartsSummary._sum.totalPrice ?? 0,
     );
-    const stockOutValue = paidServiceOrders.reduce((ordersTotal, serviceOrder) => {
-      if (serviceOrder.parts.length > 0) {
-        return ordersTotal.add(
-          serviceOrder.parts.reduce(
-            (partsTotal, part) =>
-              partsTotal.add(new Prisma.Decimal(part.inventoryItem.cost).mul(part.quantity)),
-            new Prisma.Decimal(0),
-          ),
-        );
-      }
-
-      return ordersTotal.add(
-        (serviceOrder.budget?.items ?? []).reduce(
-          (itemsTotal, item) =>
-            item.inventoryItem
-              ? itemsTotal.add(new Prisma.Decimal(item.inventoryItem.cost).mul(item.quantity))
-              : itemsTotal,
-          new Prisma.Decimal(0),
-        ),
-      );
-    }, new Prisma.Decimal(0));
+    const stockOutValue = this.stockOutValueService.calculateFromServiceOrders(paidServiceOrders);
 
     return {
       serviceOrders: {

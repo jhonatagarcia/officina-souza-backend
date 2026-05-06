@@ -8,6 +8,7 @@ describe('BudgetConversionsService', () => {
 
   const prismaMock = {
     serviceOrder: {
+      findMany: jest.fn(),
       create: jest.fn(),
     },
     $transaction: jest.fn(),
@@ -20,8 +21,8 @@ describe('BudgetConversionsService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    prismaMock.$transaction.mockImplementation(async (callback: (tx: typeof prismaMock) => unknown) =>
-      callback(prismaMock),
+    prismaMock.$transaction.mockImplementation(
+      async (callback: (tx: typeof prismaMock) => unknown) => callback(prismaMock),
     );
 
     const moduleRef = await Test.createTestingModule({
@@ -43,6 +44,7 @@ describe('BudgetConversionsService', () => {
       problemDescription: 'Falha no freio',
       notes: 'urgente',
     });
+    prismaMock.serviceOrder.findMany.mockResolvedValue([]);
     prismaMock.serviceOrder.create.mockResolvedValue({
       id: 'os-1',
       orderNumber: 'OS-1',
@@ -74,7 +76,12 @@ describe('BudgetConversionsService', () => {
           clientId: 'client-1',
           vehicleId: 'vehicle-1',
           problemDescription: 'Falha no freio',
-        }),
+        }) as {
+          budgetId: string;
+          clientId: string;
+          vehicleId: string;
+          problemDescription: string;
+        },
       }),
     );
     expect(budgetsServiceMock.markConverted).toHaveBeenCalledWith('budget-1', prismaMock as never);

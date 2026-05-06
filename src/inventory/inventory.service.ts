@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { InventoryMovementType, Prisma } from '@prisma/client';
 import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
+import { buildSafeOrderBy } from 'src/common/utils/order-by.util';
 import { buildPaginationMeta, PaginatedResponse } from 'src/common/utils/pagination.util';
 import {
   InventoryItemResponseDto,
@@ -20,22 +21,32 @@ import {
 } from 'src/inventory/dto/inventory-movement-response.dto';
 import { UpdateInventoryItemDto } from 'src/inventory/dto/update-inventory-item.dto';
 
-const INVENTORY_ORDERABLE_FIELDS = new Set(['name', 'internalCode', 'quantity', 'createdAt']);
+const INVENTORY_ORDERABLE_FIELDS = new Set([
+  'name',
+  'internalCode',
+  'quantity',
+  'createdAt',
+] as const);
 
 @Injectable()
 export class InventoryService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(createInventoryItemDto: CreateInventoryItemDto): Promise<InventoryItemResponseDto> {
-    const internalCode =
-      createInventoryItemDto.internalCode ?? (await this.generateInternalCode());
+    const internalCode = createInventoryItemDto.internalCode ?? (await this.generateInternalCode());
 
     await this.ensureUniqueCode(internalCode);
 
     const item = await this.prisma.inventoryItem.create({
       data: {
-        ...createInventoryItemDto,
+        name: createInventoryItemDto.name,
         internalCode,
+        category: createInventoryItemDto.category,
+        supplier: createInventoryItemDto.supplier,
+        quantity: createInventoryItemDto.quantity,
+        minimumQuantity: createInventoryItemDto.minimumQuantity,
+        cost: createInventoryItemDto.cost,
+        salePrice: createInventoryItemDto.salePrice,
       },
     });
 
@@ -55,16 +66,17 @@ export class InventoryService {
         }
       : {};
 
-    const sortBy = INVENTORY_ORDERABLE_FIELDS.has(pagination.sortBy ?? '')
-      ? (pagination.sortBy ?? 'createdAt')
-      : 'createdAt';
-
     const [data, total] = await this.prisma.$transaction([
       this.prisma.inventoryItem.findMany({
         where,
         skip: (pagination.page - 1) * pagination.limit,
         take: pagination.limit,
-        orderBy: { [sortBy]: pagination.sortOrder },
+        orderBy: buildSafeOrderBy(
+          INVENTORY_ORDERABLE_FIELDS,
+          pagination.sortBy,
+          'createdAt',
+          pagination.sortOrder,
+        ),
       }),
       this.prisma.inventoryItem.count({ where }),
     ]);
@@ -106,7 +118,16 @@ export class InventoryService {
     const item = await this.prisma.$transaction(async (tx) => {
       const updatedItem = await tx.inventoryItem.update({
         where: { id },
-        data: updateInventoryItemDto,
+        data: {
+          name: updateInventoryItemDto.name,
+          internalCode: updateInventoryItemDto.internalCode,
+          category: updateInventoryItemDto.category,
+          supplier: updateInventoryItemDto.supplier,
+          quantity: updateInventoryItemDto.quantity,
+          minimumQuantity: updateInventoryItemDto.minimumQuantity,
+          cost: updateInventoryItemDto.cost,
+          salePrice: updateInventoryItemDto.salePrice,
+        },
       });
 
       if (

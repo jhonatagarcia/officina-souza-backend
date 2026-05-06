@@ -1,4 +1,4 @@
-export function isCriticalStock(quantity: number, minimumQuantity: number) {
+function isCriticalStock(quantity: number, minimumQuantity: number) {
   return quantity <= minimumQuantity;
 }
 

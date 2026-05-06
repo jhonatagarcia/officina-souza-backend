@@ -1,4 +1,4 @@
-export interface ConvertedBudgetServiceOrderSummaryDto {
+interface ConvertedBudgetServiceOrderSummaryDto {
   id: string;
   orderNumber: string;
   status: string;

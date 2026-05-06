@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { BudgetStatus } from '@prisma/client';
+import { BudgetItemReferenceService } from 'src/budgets/services/budget-item-reference.service';
 import { BudgetReaderService } from 'src/budgets/services/budget-reader.service';
 import { BudgetReferenceValidatorService } from 'src/budgets/services/budget-reference-validator.service';
 import { BudgetTotalsService } from 'src/budgets/services/budget-totals.service';
@@ -35,12 +36,13 @@ describe('BudgetsService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    prismaMock.$transaction.mockImplementation(async (callback: (tx: typeof prismaMock) => unknown) =>
-      callback(prismaMock),
+    prismaMock.$transaction.mockImplementation(
+      async (callback: (tx: typeof prismaMock) => unknown) => callback(prismaMock),
     );
     const moduleRef = await Test.createTestingModule({
       providers: [
         BudgetsService,
+        BudgetItemReferenceService,
         BudgetReaderService,
         BudgetReferenceValidatorService,
         BudgetTotalsService,
@@ -78,7 +80,9 @@ describe('BudgetsService', () => {
     });
 
     const createCall = prismaMock.budget.create.mock.calls[0] as [
-      { data: { subtotal: number; total: number; items: { create: Array<{ totalPrice: number }> } } },
+      {
+        data: { subtotal: number; total: number; items: { create: Array<{ totalPrice: number }> } };
+      },
     ];
 
     expect(createCall[0].data.subtotal).toBe(100);
@@ -191,7 +195,9 @@ describe('BudgetsService', () => {
       ],
     });
 
-    expect(prismaMock.budgetItem.deleteMany).toHaveBeenCalledWith({ where: { budgetId: 'budget-1' } });
+    expect(prismaMock.budgetItem.deleteMany).toHaveBeenCalledWith({
+      where: { budgetId: 'budget-1' },
+    });
     expect(prismaMock.budget.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'budget-1' },
@@ -205,7 +211,11 @@ describe('BudgetsService', () => {
               }),
             ],
           },
-        }),
+        }) as {
+          subtotal: number;
+          total: number;
+          items: { create: Array<{ totalPrice: number }> };
+        },
       }),
     );
   });
@@ -237,8 +247,8 @@ describe('BudgetsService', () => {
         where: { id: 'budget-1' },
         data: expect.objectContaining({
           status: BudgetStatus.APROVADO,
-          approvedAt: expect.any(Date),
-        }),
+          approvedAt: expect.any(Date) as Date,
+        }) as { status: BudgetStatus; approvedAt: Date },
       }),
     );
   });

@@ -7,6 +7,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { ServiceBillingType } from 'src/common/enums/service-billing-type.enum';
 import { ServiceMaterialSource } from 'src/common/enums/service-material-source.enum';
+import { buildSafeOrderBy } from 'src/common/utils/order-by.util';
 import { buildPaginationMeta, PaginatedResponse } from 'src/common/utils/pagination.util';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateServiceCatalogItemDto } from 'src/service-catalog/dto/create-service-catalog-item.dto';
@@ -22,7 +23,7 @@ const SERVICE_CATALOG_ORDERABLE_FIELDS = new Set([
   'suggestedTotalPrice',
   'createdAt',
   'updatedAt',
-]);
+] as const);
 
 interface ServiceCatalogRuleSnapshot {
   laborPrice: Prisma.Decimal;
@@ -89,16 +90,17 @@ export class ServiceCatalogService {
         : {}),
     };
 
-    const sortBy = SERVICE_CATALOG_ORDERABLE_FIELDS.has(query.sortBy ?? '')
-      ? (query.sortBy ?? 'createdAt')
-      : 'createdAt';
-
     const [data, total] = await this.prisma.$transaction([
       this.prisma.serviceCatalogItem.findMany({
         where,
         skip: (query.page - 1) * query.limit,
         take: query.limit,
-        orderBy: { [sortBy]: query.sortOrder },
+        orderBy: buildSafeOrderBy(
+          SERVICE_CATALOG_ORDERABLE_FIELDS,
+          query.sortBy,
+          'createdAt',
+          query.sortOrder,
+        ),
       }),
       this.prisma.serviceCatalogItem.count({ where }),
     ]);

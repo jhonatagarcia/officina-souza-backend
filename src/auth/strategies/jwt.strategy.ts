@@ -21,20 +21,22 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
       secretOrKey: configService.getOrThrow<string>('auth.jwtSecret'),
+      issuer: configService.getOrThrow<string>('auth.jwtIssuer'),
+      audience: configService.getOrThrow<string>('auth.jwtAudience'),
     });
   }
 
   async validate(payload: JwtPayload): Promise<RequestUser> {
     const user = await this.usersService.findByEmail(payload.email);
 
-    if (!user || !user.isActive) {
+    if (!user || !user.isActive || user.id !== payload.sub) {
       throw new UnauthorizedException('Token invalido');
     }
 
     return {
-      sub: payload.sub,
-      email: payload.email,
-      role: payload.role,
+      sub: user.id,
+      email: user.email,
+      role: user.role,
     };
   }
 }

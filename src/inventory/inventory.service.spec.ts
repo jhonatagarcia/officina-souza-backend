@@ -68,7 +68,7 @@ describe('InventoryService', () => {
     expect(prismaMock.inventoryItem.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         internalCode: 'P-000124',
-      }),
+      }) as { internalCode: string },
     });
   });
 
@@ -122,7 +122,12 @@ describe('InventoryService', () => {
           quantityChange: -3,
           quantityBefore: 10,
           quantityAfter: 7,
-        }),
+        }) as {
+          inventoryItemId: string;
+          quantityChange: number;
+          quantityBefore: number;
+          quantityAfter: number;
+        },
       }),
     );
   });

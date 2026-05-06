@@ -7,12 +7,13 @@ import {
   toClientResponseDto,
 } from 'src/clients/dto/client-response.dto';
 import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
+import { buildSafeOrderBy } from 'src/common/utils/order-by.util';
 import { buildPaginationMeta, PaginatedResponse } from 'src/common/utils/pagination.util';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateClientDto } from 'src/clients/dto/create-client.dto';
 import { UpdateClientDto } from 'src/clients/dto/update-client.dto';
 
-const CLIENT_ORDERABLE_FIELDS = new Set(['name', 'createdAt', 'updatedAt']);
+const CLIENT_ORDERABLE_FIELDS = new Set(['name', 'createdAt', 'updatedAt'] as const);
 
 @Injectable()
 export class ClientsService {
@@ -50,16 +51,17 @@ export class ClientsService {
         : {}),
     };
 
-    const sortBy = CLIENT_ORDERABLE_FIELDS.has(pagination.sortBy ?? '')
-      ? (pagination.sortBy ?? 'createdAt')
-      : 'createdAt';
-
     const [data, total] = await this.prisma.$transaction([
       this.prisma.client.findMany({
         where,
         skip: (pagination.page - 1) * pagination.limit,
         take: pagination.limit,
-        orderBy: { [sortBy]: pagination.sortOrder },
+        orderBy: buildSafeOrderBy(
+          CLIENT_ORDERABLE_FIELDS,
+          pagination.sortBy,
+          'createdAt',
+          pagination.sortOrder,
+        ),
       }),
       this.prisma.client.count({ where }),
     ]);

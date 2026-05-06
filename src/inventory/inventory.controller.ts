@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
@@ -37,19 +47,22 @@ export class InventoryController {
 
   @Get(':id/movements')
   @Roles(Role.ADMIN, Role.ATENDENTE, Role.FINANCEIRO)
-  getMovements(@Param('id') id: string) {
+  getMovements(@Param('id', ParseUUIDPipe) id: string) {
     return this.inventoryService.getMovements(id);
   }
 
   @Get(':id')
   @Roles(Role.ADMIN, Role.ATENDENTE, Role.FINANCEIRO)
-  findOne(@Param('id') id: string) {
+  findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.inventoryService.findOne(id);
   }
 
   @Patch(':id')
   @Roles(Role.ADMIN, Role.ATENDENTE)
-  update(@Param('id') id: string, @Body() updateInventoryItemDto: UpdateInventoryItemDto) {
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updateInventoryItemDto: UpdateInventoryItemDto,
+  ) {
     return this.inventoryService.update(id, updateInventoryItemDto);
   }
 }

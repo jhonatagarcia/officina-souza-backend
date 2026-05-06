@@ -1,6 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { Prisma } from '@prisma/client';
 import { DashboardService } from 'src/dashboard/dashboard.service';
+import { StockOutValueService } from 'src/financial/services/stock-out-value.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 describe('DashboardService', () => {
@@ -29,7 +30,11 @@ describe('DashboardService', () => {
     jest.clearAllMocks();
 
     const moduleRef = await Test.createTestingModule({
-      providers: [DashboardService, { provide: PrismaService, useValue: prismaMock }],
+      providers: [
+        DashboardService,
+        StockOutValueService,
+        { provide: PrismaService, useValue: prismaMock },
+      ],
     }).compile();
 
     service = moduleRef.get(DashboardService);
@@ -64,12 +69,12 @@ describe('DashboardService', () => {
         internalCode: 'PEC-000003',
       },
     ]);
-    prismaMock.financialEntry.aggregate
-      .mockResolvedValueOnce({
-        _sum: { amount: new Prisma.Decimal(350) },
-      });
-    prismaMock.serviceOrderPart.aggregate
-      .mockResolvedValueOnce({ _sum: { totalPrice: new Prisma.Decimal(90) } });
+    prismaMock.financialEntry.aggregate.mockResolvedValueOnce({
+      _sum: { amount: new Prisma.Decimal(350) },
+    });
+    prismaMock.serviceOrderPart.aggregate.mockResolvedValueOnce({
+      _sum: { totalPrice: new Prisma.Decimal(90) },
+    });
     prismaMock.serviceOrder.findMany.mockResolvedValue([
       {
         parts: [],
@@ -184,8 +189,8 @@ describe('DashboardService', () => {
       _sum: { totalPrice: true },
       where: {
         updatedAt: {
-          gte: expect.any(Date),
-          lt: expect.any(Date),
+          gte: expect.any(Date) as Date,
+          lt: expect.any(Date) as Date,
         },
         serviceOrder: {
           financialEntries: {

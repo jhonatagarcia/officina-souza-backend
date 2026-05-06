@@ -1,18 +1,18 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDateString, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator';
+import { IsDateString, IsOptional, IsString, IsUUID, MaxLength, ValidateIf } from 'class-validator';
 
 export class CreateServiceOrderDto {
   @ApiProperty()
-  @IsString()
+  @IsUUID()
   clientId!: string;
 
   @ApiProperty()
-  @IsString()
+  @IsUUID()
   vehicleId!: string;
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsString()
+  @IsUUID()
   mechanicId?: string;
 
   @ApiProperty()

@@ -12,8 +12,8 @@ import {
   toBudgetResponseDto,
 } from 'src/budgets/dto/budget-response.dto';
 import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
+import { buildSafeOrderBy } from 'src/common/utils/order-by.util';
 import { buildPaginationMeta, PaginatedResponse } from 'src/common/utils/pagination.util';
-import { BudgetReaderService } from 'src/budgets/services/budget-reader.service';
 import { CreateBudgetUseCase } from 'src/budgets/use-cases/create-budget.use-case';
 import { UpdateBudgetUseCase } from 'src/budgets/use-cases/update-budget.use-case';
 import { ApproveBudgetUseCase } from 'src/budgets/use-cases/approve-budget.use-case';
@@ -22,13 +22,18 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateBudgetDto } from 'src/budgets/dto/create-budget.dto';
 import { UpdateBudgetDto } from 'src/budgets/dto/update-budget.dto';
 
-const BUDGET_ORDERABLE_FIELDS = new Set(['createdAt', 'updatedAt', 'status', 'total', 'code']);
+const BUDGET_ORDERABLE_FIELDS = new Set([
+  'createdAt',
+  'updatedAt',
+  'status',
+  'total',
+  'code',
+] as const);
 
 @Injectable()
 export class BudgetsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly budgetReader: BudgetReaderService,
     private readonly createBudgetUseCase: CreateBudgetUseCase,
     private readonly updateBudgetUseCase: UpdateBudgetUseCase,
     private readonly approveBudgetUseCase: ApproveBudgetUseCase,
@@ -58,16 +63,17 @@ export class BudgetsService {
       ...(pagination.status ? { status: pagination.status as BudgetStatus } : {}),
     };
 
-    const sortBy = BUDGET_ORDERABLE_FIELDS.has(pagination.sortBy ?? '')
-      ? (pagination.sortBy ?? 'createdAt')
-      : 'createdAt';
-
     const [data, total] = await this.prisma.$transaction([
       this.prisma.budget.findMany({
         where,
         skip: (pagination.page - 1) * pagination.limit,
         take: pagination.limit,
-        orderBy: { [sortBy]: pagination.sortOrder },
+        orderBy: buildSafeOrderBy(
+          BUDGET_ORDERABLE_FIELDS,
+          pagination.sortBy,
+          'createdAt',
+          pagination.sortOrder,
+        ),
         include: { client: true, vehicle: true, items: true, serviceOrder: true },
       }),
       this.prisma.budget.count({ where }),
@@ -136,9 +142,5 @@ export class BudgetsService {
     }
 
     return budget;
-  }
-
-  async ensureExists(id: string) {
-    return this.budgetReader.ensureExists(id);
   }
 }

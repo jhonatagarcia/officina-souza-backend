@@ -12,7 +12,7 @@ export interface ClientResponseDto {
   updatedAt: Date;
 }
 
-export interface ClientVehicleSummaryDto {
+interface ClientVehicleSummaryDto {
   id: string;
   plate: string;
   brand: string;
@@ -45,7 +45,9 @@ export function toClientResponseDto(client: ClientModel): ClientResponseDto {
   };
 }
 
-export function toClientDetailResponseDto(client: ClientWithVehiclesModel): ClientDetailResponseDto {
+export function toClientDetailResponseDto(
+  client: ClientWithVehiclesModel,
+): ClientDetailResponseDto {
   return {
     ...toClientResponseDto(client),
     vehicles: client.vehicles.map((vehicle) => ({

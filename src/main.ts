@@ -24,7 +24,7 @@ async function bootstrap(): Promise<void> {
   app.use(helmet());
   app.enableCors({
     origin: configService.getOrThrow<string[]>('cors.origin'),
-    credentials: true,
+    credentials: configService.getOrThrow<boolean>('cors.credentials'),
   });
   app.useGlobalPipes(
     new ValidationPipe({
@@ -40,15 +40,20 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle(configService.getOrThrow<string>('app.name'))
-    .setDescription('API do sistema de gestão para oficina mecânica')
-    .setVersion(configService.getOrThrow<string>('app.version'))
-    .addBearerAuth()
-    .build();
+  if (
+    configService.getOrThrow<boolean>('swagger.enabled') &&
+    configService.getOrThrow<string>('nodeEnv') !== 'production'
+  ) {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle(configService.getOrThrow<string>('app.name'))
+      .setDescription('API do sistema de gestão para oficina mecânica')
+      .setVersion(configService.getOrThrow<string>('app.version'))
+      .addBearerAuth()
+      .build();
 
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('docs', app, document);
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('docs', app, document);
+  }
 
   const prismaService = app.get(PrismaService);
   await prismaService.enableShutdownHooks(app);

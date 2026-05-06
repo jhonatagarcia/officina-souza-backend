@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsIn,
   IsInt,
   IsNotEmpty,
@@ -45,6 +46,14 @@ class EnvironmentVariables {
   @IsNotEmpty()
   JWT_EXPIRES_IN!: string;
 
+  @IsOptional()
+  @IsString()
+  JWT_ISSUER?: string;
+
+  @IsOptional()
+  @IsString()
+  JWT_AUDIENCE?: string;
+
   @Transform(({ value }) => Number(value))
   @IsInt()
   @Min(10)
@@ -54,6 +63,11 @@ class EnvironmentVariables {
   @IsString()
   @IsNotEmpty()
   CORS_ORIGIN!: string;
+
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  CORS_CREDENTIALS?: boolean;
 
   @Transform(({ value }) => Number(value))
   @IsInt()
@@ -70,6 +84,11 @@ class EnvironmentVariables {
   LOG_LEVEL!: string;
 
   @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  ENABLE_SWAGGER?: boolean;
+
+  @IsOptional()
   @IsString()
   SEED_ADMIN_EMAIL?: string;
 
@@ -80,7 +99,6 @@ class EnvironmentVariables {
   @IsOptional()
   @IsString()
   SEED_ADMIN_NAME?: string;
-
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvironmentVariables {
@@ -98,5 +116,44 @@ export function validateEnv(config: Record<string, unknown>): EnvironmentVariabl
     );
   }
 
+  validateSecurityConstraints(validatedConfig);
+
   return validatedConfig;
+}
+
+function validateSecurityConstraints(config: EnvironmentVariables): void {
+  const securityErrors: string[] = [];
+  const corsOrigins = config.CORS_ORIGIN.split(',').map((origin) => origin.trim());
+
+  if (corsOrigins.some((origin) => !origin)) {
+    securityErrors.push('CORS_ORIGIN nao pode conter origens vazias');
+  }
+
+  if (corsOrigins.includes('*')) {
+    securityErrors.push('CORS_ORIGIN nao pode usar wildcard');
+  }
+
+  if (config.NODE_ENV === 'production') {
+    const weakJwtSecrets = new Set(['secret', 'changeme', 'change-me', 'jwt-secret']);
+
+    if (config.JWT_SECRET.length < 32 || weakJwtSecrets.has(config.JWT_SECRET.toLowerCase())) {
+      securityErrors.push('JWT_SECRET deve ter pelo menos 32 caracteres em producao');
+    }
+
+    if (!config.JWT_ISSUER?.trim()) {
+      securityErrors.push('JWT_ISSUER deve ser definido em producao');
+    }
+
+    if (!config.JWT_AUDIENCE?.trim()) {
+      securityErrors.push('JWT_AUDIENCE deve ser definido em producao');
+    }
+
+    if (config.ENABLE_SWAGGER === true) {
+      securityErrors.push('ENABLE_SWAGGER nao pode ser true em producao');
+    }
+  }
+
+  if (securityErrors.length > 0) {
+    throw new Error(`Falha na validacao de seguranca do ambiente: ${securityErrors.join(', ')}`);
+  }
 }

@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
 
-export interface VehicleClientSummaryDto {
+interface VehicleClientSummaryDto {
   id: string;
   name: string;
   document: string | null;
@@ -63,7 +63,9 @@ export function toVehicleResponseDto(vehicle: VehicleModel): VehicleResponseDto 
   };
 }
 
-export function toVehicleDetailResponseDto(vehicle: VehicleWithClientModel): VehicleDetailResponseDto {
+export function toVehicleDetailResponseDto(
+  vehicle: VehicleWithClientModel,
+): VehicleDetailResponseDto {
   return {
     ...toVehicleResponseDto(vehicle),
     client: {

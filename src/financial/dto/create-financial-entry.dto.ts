@@ -1,7 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDateString, IsEnum, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsDateString, IsEnum, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 import { FinancialEntryType } from 'src/common/enums/financial-entry-type.enum';
-import { FinancialStatus } from 'src/common/enums/financial-status.enum';
 import { PaymentMethod } from 'src/common/enums/payment-method.enum';
 
 export class CreateFinancialEntryDto {
@@ -31,19 +30,14 @@ export class CreateFinancialEntryDto {
   @IsEnum(PaymentMethod)
   paymentMethod?: PaymentMethod;
 
-  @ApiPropertyOptional({ enum: FinancialStatus })
-  @IsOptional()
-  @IsEnum(FinancialStatus)
-  status?: FinancialStatus;
-
   @ApiPropertyOptional()
   @IsOptional()
-  @IsString()
+  @IsUUID()
   clientId?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsString()
+  @IsUUID()
   serviceOrderId?: string;
 
   @ApiPropertyOptional()

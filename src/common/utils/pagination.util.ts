@@ -1,6 +1,6 @@
 import type { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
 
-export interface PaginationMeta {
+interface PaginationMeta {
   page: number;
   limit: number;
   total: number;

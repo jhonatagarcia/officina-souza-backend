@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
@@ -33,31 +43,37 @@ export class ServiceOrdersController {
 
   @Get(':id')
   @Roles(Role.ADMIN, Role.ATENDENTE, Role.MECANICO, Role.FINANCEIRO)
-  findOne(@Param('id') id: string) {
+  findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.serviceOrdersService.findOne(id);
   }
 
   @Patch(':id')
   @Roles(Role.ADMIN, Role.ATENDENTE, Role.MECANICO)
-  update(@Param('id') id: string, @Body() updateServiceOrderDto: UpdateServiceOrderDto) {
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updateServiceOrderDto: UpdateServiceOrderDto,
+  ) {
     return this.serviceOrdersService.update(id, updateServiceOrderDto);
   }
 
   @Patch(':id/status')
   @Roles(Role.ADMIN, Role.ATENDENTE, Role.MECANICO)
-  updateStatus(@Param('id') id: string, @Body() updateStatusDto: UpdateServiceOrderStatusDto) {
+  updateStatus(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updateStatusDto: UpdateServiceOrderStatusDto,
+  ) {
     return this.serviceOrdersService.updateStatus(id, updateStatusDto);
   }
 
   @Post(':id/parts')
   @Roles(Role.ADMIN, Role.ATENDENTE, Role.MECANICO)
-  addPart(@Param('id') id: string, @Body() addPartDto: AddServiceOrderPartDto) {
+  addPart(@Param('id', ParseUUIDPipe) id: string, @Body() addPartDto: AddServiceOrderPartDto) {
     return this.serviceOrdersService.addPart(id, addPartDto);
   }
 
   @Get(':id/parts')
   @Roles(Role.ADMIN, Role.ATENDENTE, Role.MECANICO, Role.FINANCEIRO)
-  listParts(@Param('id') id: string) {
+  listParts(@Param('id', ParseUUIDPipe) id: string) {
     return this.serviceOrdersService.listParts(id);
   }
 }

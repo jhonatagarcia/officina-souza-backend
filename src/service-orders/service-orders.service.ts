@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, ServiceOrderStatus } from '@prisma/client';
 import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
+import { buildSafeOrderBy } from 'src/common/utils/order-by.util';
 import { buildPaginationMeta, PaginatedResponse } from 'src/common/utils/pagination.util';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { AddServiceOrderPartDto } from 'src/service-orders/dto/add-service-order-part.dto';
@@ -29,7 +30,7 @@ const SERVICE_ORDER_ORDERABLE_FIELDS = new Set([
   'updatedAt',
   'status',
   'openedAt',
-]);
+] as const);
 
 @Injectable()
 export class ServiceOrdersService {
@@ -61,21 +62,20 @@ export class ServiceOrdersService {
             ],
           }
         : {}),
-      ...(pagination.status
-        ? { status: pagination.status as ServiceOrderStatus }
-        : {}),
+      ...(pagination.status ? { status: pagination.status as ServiceOrderStatus } : {}),
     };
-
-    const sortBy = SERVICE_ORDER_ORDERABLE_FIELDS.has(pagination.sortBy ?? '')
-      ? (pagination.sortBy ?? 'createdAt')
-      : 'createdAt';
 
     const [data, total] = await this.prisma.$transaction([
       this.prisma.serviceOrder.findMany({
         where,
         skip: (pagination.page - 1) * pagination.limit,
         take: pagination.limit,
-        orderBy: { [sortBy]: pagination.sortOrder },
+        orderBy: buildSafeOrderBy(
+          SERVICE_ORDER_ORDERABLE_FIELDS,
+          pagination.sortBy,
+          'createdAt',
+          pagination.sortOrder,
+        ),
         include: {
           client: true,
           vehicle: true,
@@ -204,5 +204,4 @@ export class ServiceOrdersService {
 
     return serviceOrder;
   }
-
 }

@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
@@ -39,19 +49,22 @@ export class FinancialController {
 
   @Get(':id')
   @Roles(Role.ADMIN, Role.FINANCEIRO)
-  findOne(@Param('id') id: string) {
+  findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.financialService.findOne(id);
   }
 
   @Patch(':id')
   @Roles(Role.ADMIN, Role.FINANCEIRO)
-  update(@Param('id') id: string, @Body() updateFinancialEntryDto: UpdateFinancialEntryDto) {
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updateFinancialEntryDto: UpdateFinancialEntryDto,
+  ) {
     return this.financialService.update(id, updateFinancialEntryDto);
   }
 
   @Patch(':id/pay')
   @Roles(Role.ADMIN, Role.FINANCEIRO)
-  pay(@Param('id') id: string, @Body() payFinancialEntryDto: PayFinancialEntryDto) {
+  pay(@Param('id', ParseUUIDPipe) id: string, @Body() payFinancialEntryDto: PayFinancialEntryDto) {
     return this.financialService.pay(id, payFinancialEntryDto);
   }
 }

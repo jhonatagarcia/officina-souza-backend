@@ -1,13 +1,13 @@
 import { Prisma } from '@prisma/client';
 
-export interface ServiceOrderClientSummaryDto {
+interface ServiceOrderClientSummaryDto {
   id: string;
   name: string;
   document: string | null;
   phone: string | null;
 }
 
-export interface ServiceOrderVehicleSummaryDto {
+interface ServiceOrderVehicleSummaryDto {
   id: string;
   plate: string;
   brand: string;
@@ -15,20 +15,20 @@ export interface ServiceOrderVehicleSummaryDto {
   year: number;
 }
 
-export interface ServiceOrderMechanicSummaryDto {
+interface ServiceOrderMechanicSummaryDto {
   id: string;
   name: string;
   email: string;
   role: string;
 }
 
-export interface ServiceOrderPartInventorySummaryDto {
+interface ServiceOrderPartInventorySummaryDto {
   id: string;
   name: string;
   internalCode: string;
 }
 
-export interface ServiceOrderBudgetItemInventorySummaryDto {
+interface ServiceOrderBudgetItemInventorySummaryDto {
   id: string;
   name: string;
   internalCode: string;
@@ -46,7 +46,7 @@ export interface ServiceOrderPartResponseDto {
   inventoryItem: ServiceOrderPartInventorySummaryDto;
 }
 
-export interface ServiceOrderBudgetItemResponseDto {
+interface ServiceOrderBudgetItemResponseDto {
   id: string;
   type: string;
   inventoryItemId: string | null;
@@ -127,7 +127,9 @@ type ServiceOrderPartWithInventoryModel = Prisma.ServiceOrderPartGetPayload<{
   include: { inventoryItem: true };
 }>;
 
-export function toServiceOrderResponseDto(serviceOrder: ServiceOrderModel): ServiceOrderResponseDto {
+export function toServiceOrderResponseDto(
+  serviceOrder: ServiceOrderModel,
+): ServiceOrderResponseDto {
   return {
     id: serviceOrder.id,
     orderNumber: serviceOrder.orderNumber,
@@ -174,34 +176,32 @@ export function toServiceOrderDetailResponseDto(
   serviceOrder: ServiceOrderWithRelationsModel,
 ): ServiceOrderDetailResponseDto {
   const partsTotal = serviceOrder.budget
-    ? serviceOrder.budget.items
-        .reduce((acc, item) => {
-          if (item.type === 'PART') {
-            return acc.plus(item.totalPrice);
-          }
+    ? serviceOrder.budget.items.reduce((acc, item) => {
+        if (item.type === 'PART') {
+          return acc.plus(item.totalPrice);
+        }
 
-          if (item.type === 'LABOR_AND_PART' && item.inventoryItem) {
-            return acc.plus(new Prisma.Decimal(item.inventoryItem.salePrice).mul(item.quantity));
-          }
+        if (item.type === 'LABOR_AND_PART' && item.inventoryItem) {
+          return acc.plus(new Prisma.Decimal(item.inventoryItem.salePrice).mul(item.quantity));
+        }
 
-          return acc;
-        }, new Prisma.Decimal(0))
+        return acc;
+      }, new Prisma.Decimal(0))
     : serviceOrder.parts.reduce((acc, part) => acc.plus(part.totalPrice), new Prisma.Decimal(0));
   const laborTotal = serviceOrder.budget
-    ? serviceOrder.budget.items
-        .reduce((acc, item) => {
-          if (item.type === 'LABOR') {
-            return acc.plus(item.totalPrice);
-          }
+    ? serviceOrder.budget.items.reduce((acc, item) => {
+        if (item.type === 'LABOR') {
+          return acc.plus(item.totalPrice);
+        }
 
-          if (item.type === 'LABOR_AND_PART' && item.serviceCatalogItem) {
-            return acc.plus(
-              new Prisma.Decimal(item.serviceCatalogItem.laborPrice).mul(item.quantity),
-            );
-          }
+        if (item.type === 'LABOR_AND_PART' && item.serviceCatalogItem) {
+          return acc.plus(
+            new Prisma.Decimal(item.serviceCatalogItem.laborPrice).mul(item.quantity),
+          );
+        }
 
-          return acc;
-        }, new Prisma.Decimal(0))
+        return acc;
+      }, new Prisma.Decimal(0))
     : new Prisma.Decimal(0);
   const discount = serviceOrder.budget?.discount ?? new Prisma.Decimal(0);
   const total = serviceOrder.budget?.total ?? partsTotal.plus(laborTotal).minus(discount);
@@ -212,23 +212,23 @@ export function toServiceOrderDetailResponseDto(
     laborTotal,
     discount,
     total,
-      budgetItems: (serviceOrder.budget?.items ?? []).map((item) => ({
-        id: item.id,
-        type: item.type,
-        inventoryItemId: item.inventoryItemId,
-        serviceCode: item.serviceCode,
-        description: item.description,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        totalPrice: item.totalPrice,
-        inventoryItem: item.inventoryItem
-          ? {
-              id: item.inventoryItem.id,
-              name: item.inventoryItem.name,
-              internalCode: item.inventoryItem.internalCode,
-            }
-          : null,
-      })),
+    budgetItems: (serviceOrder.budget?.items ?? []).map((item) => ({
+      id: item.id,
+      type: item.type,
+      inventoryItemId: item.inventoryItemId,
+      serviceCode: item.serviceCode,
+      description: item.description,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      totalPrice: item.totalPrice,
+      inventoryItem: item.inventoryItem
+        ? {
+            id: item.inventoryItem.id,
+            name: item.inventoryItem.name,
+            internalCode: item.inventoryItem.internalCode,
+          }
+        : null,
+    })),
     client: {
       id: serviceOrder.client.id,
       name: serviceOrder.client.name,
