@@ -1,83 +1,83 @@
-# Backend Documentation - oficina-backend
+# Documentação do Backend - oficina-backend
 
-## 1. Visao Geral Do Projeto
+## 1. Visão Geral do Projeto
 
-O `oficina-backend` e o backend MVP de um sistema de gestao para oficina mecanica. A API centraliza fluxos operacionais como autenticacao, usuarios internos, clientes, veiculos, orcamentos, ordens de servico, catalogo de servicos, estoque, financeiro, dashboard e healthcheck.
+O `oficina-backend` é o backend MVP de um sistema de gestão para oficina mecânica. A API centraliza fluxos operacionais como autenticação, usuários internos, clientes, veículos, orçamentos, ordens de serviço, catálogo de serviços, estoque, financeiro, dashboard e healthcheck.
 
-O projeto foi construido com NestJS, TypeScript, PostgreSQL e Prisma. Ele expoe uma API HTTP versionada, protegida por JWT e controle de acesso por papeis.
+O projeto foi construído com NestJS, TypeScript, PostgreSQL e Prisma. Ele expõe uma API HTTP versionada, protegida por JWT e controle de acesso por papéis.
 
-### Proposito
+### Propósito
 
-O backend resolve a necessidade de organizar digitalmente a operacao de uma oficina mecanica, conectando informacoes que normalmente ficam dispersas:
+O backend resolve a necessidade de organizar digitalmente a operação de uma oficina mecânica, conectando informações que normalmente ficam dispersas:
 
 - cadastro de clientes;
-- cadastro e historico de veiculos;
-- criacao e acompanhamento de orcamentos;
-- conversao de orcamentos aprovados em ordens de servico;
-- controle de status da execucao;
-- consumo de pecas do estoque;
-- geracao de lancamentos financeiros;
+- cadastro e histórico de veículos;
+- criação e acompanhamento de orçamentos;
+- conversão de orçamentos aprovados em ordens de serviço;
+- controle de status da execução;
+- consumo de peças do estoque;
+- geração de lançamentos financeiros;
 - indicadores consolidados para dashboard.
 
-### Objetivo Dentro Da Solucao
+### Objetivo Dentro da Solução
 
-O backend e a camada responsavel por:
+O backend é a camada responsável por:
 
-- persistir os dados do dominio;
-- validar regras de negocio;
-- autenticar e autorizar usuarios;
+- persistir os dados do domínio;
+- validar regras de negócio;
+- autenticar e autorizar usuários;
 - expor endpoints REST para o frontend ou outros consumidores;
-- coordenar fluxos transacionais, como conversao de orcamento, consumo de estoque e geracao de contas a receber.
+- coordenar fluxos transacionais, como conversão de orçamento, consumo de estoque e geração de contas a receber.
 
-## 2. Necessidade Do Projeto
+## 2. Necessidade do Projeto
 
-Oficinas mecanicas precisam acompanhar, de forma integrada, quem e o cliente, qual veiculo esta em atendimento, quais problemas foram relatados, quais servicos e pecas foram orcados, qual o status da ordem de servico e qual impacto financeiro foi gerado.
+Oficinas mecânicas precisam acompanhar, de forma integrada, quem é o cliente, qual veículo está em atendimento, quais problemas foram relatados, quais serviços e peças foram orçados, qual o status da ordem de serviço e qual impacto financeiro foi gerado.
 
-Este backend existe para estruturar esse fluxo de ponta a ponta. Ele reduz perda de informacao entre atendimento, mecanica, estoque e financeiro.
+Este backend existe para estruturar esse fluxo de ponta a ponta. Ele reduz perda de informação entre atendimento, mecânica, estoque e financeiro.
 
-### Fluxo Principal Do Sistema
+### Fluxo Principal do Sistema
 
-1. Um usuario autenticado cadastra cliente e veiculo.
-2. O atendimento cria um orcamento com itens de mao de obra, pecas ou ambos.
-3. O orcamento pode ser aprovado ou reprovado.
-4. Um orcamento aprovado pode ser convertido em ordem de servico.
-5. A ordem de servico evolui por status: `ABERTA`, `EM_ANDAMENTO`, `FINALIZADA`, `ENTREGUE`.
-6. Ao finalizar uma OS, o backend registra historico do veiculo e pode consumir itens de estoque vinculados ao orcamento.
-7. Ao entregar uma OS, o backend cria lancamento financeiro a receber quando houver valor a cobrar.
-8. Dashboard e financeiro consolidam informacoes operacionais.
+1. Um usuário autenticado cadastra cliente e veículo.
+2. O atendimento cria um orçamento com itens de mão de obra, peças ou ambos.
+3. O orçamento pode ser aprovado ou reprovado.
+4. Um orçamento aprovado pode ser convertido em ordem de serviço.
+5. A ordem de serviço evolui por status: `ABERTA`, `EM_ANDAMENTO`, `FINALIZADA`, `ENTREGUE`.
+6. Ao finalizar uma OS, o backend registra histórico do veículo e pode consumir itens de estoque vinculados ao orçamento.
+7. Ao entregar uma OS, o backend cria lançamento financeiro a receber quando houver valor a cobrar.
+8. Dashboard e financeiro consolidam informações operacionais.
 
 ## 3. Escopo Funcional
 
-### Modulos Implementados
+### Módulos Implementados
 
-- Autenticacao e sessao JWT.
-- Usuarios internos.
-- Mecanicos como usuarios internos simplificados.
+- Autenticação e sessão JWT.
+- Usuários internos.
+- Mecânicos como usuários internos simplificados.
 - Clientes.
-- Veiculos e historico.
-- Orcamentos.
-- Conversao de orcamento em ordem de servico.
-- Ordens de servico.
-- Catalogo de servicos.
+- Veículos e histórico.
+- Orçamentos.
+- Conversão de orçamento em ordem de serviço.
+- Ordens de serviço.
+- Catálogo de serviços.
 - Estoque.
-- Movimentacoes de estoque.
-- Lancamentos financeiros.
+- Movimentações de estoque.
+- Lançamentos financeiros.
 - Dashboard.
 - Healthcheck.
 
-### Limites Do MVP
+### Limites do MVP
 
-O projeto se declara como MVP no `package.json` e no `README.md`. Pelo codigo atual, o MVP nao implementa:
+O projeto se declara como MVP no `package.json` e no `README.md`. Pelo código atual, o MVP não implementa:
 
 - multi-tenancy;
 - refresh token;
 - auditoria dedicada;
-- rastreamento distribuido;
-- permissoes por propriedade de recurso;
+- rastreamento distribuído;
+- permissões por propriedade de recurso;
 - healthcheck de banco de dados;
-- remocao fisica de clientes.
+- remoção física de clientes.
 
-## 4. Stack E Tecnologias
+## 4. Stack e Tecnologias
 
 - Linguagem: TypeScript.
 - Runtime: Node.js `>=22.0.0`.
@@ -85,43 +85,43 @@ O projeto se declara como MVP no `package.json` e no `README.md`. Pelo codigo at
 - Framework: NestJS 11.
 - Banco de dados: PostgreSQL.
 - ORM: Prisma.
-- Autenticacao: JWT com Passport.
+- Autenticação: JWT com Passport.
 - Hash de senha: bcrypt.
-- Validacao: class-validator e class-transformer.
-- Documentacao API: Swagger/OpenAPI via `@nestjs/swagger`.
-- Seguranca HTTP: Helmet.
-- CORS: configuravel por variaveis de ambiente.
+- Validação: class-validator e class-transformer.
+- Documentação API: Swagger/OpenAPI via `@nestjs/swagger`.
+- Segurança HTTP: Helmet.
+- CORS: configurável por variáveis de ambiente.
 - Rate limiting: `@nestjs/throttler`.
 - Logs: `nestjs-pino`, `pino`, `pino-http`.
 - Testes: Jest e Supertest.
 - Containers: Dockerfile e Docker Compose.
 - Qualidade: ESLint e Prettier.
 
-## 5. Arquitetura Do Backend
+## 5. Arquitetura do Backend
 
-O backend segue uma arquitetura modular baseada no NestJS. Cada dominio possui um modulo proprio, geralmente composto por controller, service, DTOs e, quando o fluxo exige mais coordenacao, use-cases.
+O backend segue uma arquitetura modular baseada no NestJS. Cada domínio possui um módulo próprio, geralmente composto por controller, service, DTOs e, quando o fluxo exige mais coordenação, use-cases.
 
-### Organizacao Geral
+### Organização Geral
 
-- Controllers recebem requisicoes HTTP, aplicam guards e delegam para services.
-- DTOs definem contratos de entrada e validacoes.
-- Services concentram operacoes de aplicacao e persistencia.
-- Use-cases encapsulam fluxos com regras de negocio mais fortes.
+- Controllers recebem requisições HTTP, aplicam guards e delegam para services.
+- DTOs definem contratos de entrada e validações.
+- Services concentram operações de aplicação e persistência.
+- Use-cases encapsulam fluxos com regras de negócio mais fortes.
 - PrismaService centraliza o acesso ao banco via Prisma Client.
-- Guards aplicam autenticacao e autorizacao.
+- Guards aplicam autenticação e autorização.
 - Filtro global padroniza respostas de erro.
 
-### Decisoes Arquiteturais Relevantes
+### Decisões Arquiteturais Relevantes
 
-- API com prefixo global configuravel por `API_PREFIX`.
-- Versionamento por URI com versao padrao `v1`.
-- Validacao global com `whitelist`, `forbidNonWhitelisted` e transformacao.
+- API com prefixo global configurável por `API_PREFIX`.
+- Versionamento por URI com versão padrão `v1`.
+- Validação global com `whitelist`, `forbidNonWhitelisted` e transformação.
 - RBAC por decorators `@Roles(...)` e `RolesGuard`.
-- Transacoes Prisma em fluxos sensiveis, como atualizacao de orcamento, conversao em OS, baixa de estoque e pagamento.
-- Ordenacao protegida por allowlist de campos usando `buildSafeOrderBy`.
-- Paginacao padronizada com resposta `{ data, meta }`.
+- Transações Prisma em fluxos sensíveis, como atualização de orçamento, conversão em OS, baixa de estoque e pagamento.
+- Ordenação protegida por allowlist de campos usando `buildSafeOrderBy`.
+- Paginação padronizada com resposta `{ data, meta }`.
 
-## 6. Estrutura De Pastas
+## 6. Estrutura de Pastas
 
 ```text
 src/
@@ -151,60 +151,60 @@ test/
 
 ### Principais Responsabilidades
 
-- `src/main.ts`: bootstrap da aplicacao, prefixo global, versionamento, CORS, Helmet, Swagger, pipes e shutdown hooks do Prisma.
-- `src/app.module.ts`: composicao dos modulos, logger, rate limiting e filtro global.
+- `src/main.ts`: bootstrap da aplicação, prefixo global, versionamento, CORS, Helmet, Swagger, pipes e shutdown hooks do Prisma.
+- `src/app.module.ts`: composição dos módulos, logger, rate limiting e filtro global.
 - `src/auth`: login, registro protegido, JWT strategy e guard.
-- `src/users`: gestao de usuarios internos e mecanicos.
-- `src/clients`: cadastro, listagem, atualizacao e inativacao de clientes.
-- `src/vehicles`: cadastro, listagem, atualizacao e historico de veiculos.
-- `src/budgets`: criacao, atualizacao, aprovacao e reprovacao de orcamentos.
-- `src/budget-conversions`: conversao de orcamento aprovado em OS.
-- `src/service-orders`: ordens de servico, status e pecas utilizadas.
-- `src/service-catalog`: catalogo de servicos.
-- `src/inventory`: estoque, alertas e movimentacoes.
-- `src/financial`: lancamentos financeiros, pagamento e resumo.
+- `src/users`: gestão de usuários internos e mecânicos.
+- `src/clients`: cadastro, listagem, atualização e inativação de clientes.
+- `src/vehicles`: cadastro, listagem, atualização e histórico de veículos.
+- `src/budgets`: criação, atualização, aprovação e reprovação de orçamentos.
+- `src/budget-conversions`: conversão de orçamento aprovado em OS.
+- `src/service-orders`: ordens de serviço, status e peças utilizadas.
+- `src/service-catalog`: catálogo de serviços.
+- `src/inventory`: estoque, alertas e movimentações.
+- `src/financial`: lançamentos financeiros, pagamento e resumo.
 - `src/dashboard`: indicadores operacionais.
 - `src/health`: healthcheck simples.
-- `src/common`: guards, decorators, enums, filtros, DTOs e utilitarios compartilhados.
-- `src/config`: configuracao e validacao de ambiente.
+- `src/common`: guards, decorators, enums, filtros, DTOs e utilitários compartilhados.
+- `src/config`: configuração e validação de ambiente.
 - `prisma/schema.prisma`: modelo de dados.
 - `prisma/seed.ts`: seed opcional de administrador.
 
-## 7. Dominio De Negocio
+## 7. Domínio de Negócio
 
 ### Entidades Principais
 
-- `User`: usuario interno do sistema.
+- `User`: usuário interno do sistema.
 - `Client`: cliente da oficina.
-- `Vehicle`: veiculo vinculado a um cliente.
-- `Budget`: orcamento para um cliente e veiculo.
-- `BudgetItem`: item de orcamento, podendo representar peca, mao de obra ou ambos.
-- `ServiceOrder`: ordem de servico.
-- `ServiceOrderPart`: peca efetivamente usada em uma OS.
+- `Vehicle`: veículo vinculado a um cliente.
+- `Budget`: orçamento para um cliente e veículo.
+- `BudgetItem`: item de orçamento, podendo representar peça, mão de obra ou ambos.
+- `ServiceOrder`: ordem de serviço.
+- `ServiceOrderPart`: peça efetivamente usada em uma OS.
 - `InventoryItem`: item de estoque.
-- `InventoryMovement`: movimentacao de estoque.
-- `FinancialEntry`: lancamento financeiro a pagar ou receber.
-- `VehicleHistory`: historico de atendimento do veiculo.
-- `ServiceCatalogItem`: servico catalogado com precificacao e regras.
+- `InventoryMovement`: movimentação de estoque.
+- `FinancialEntry`: lançamento financeiro a pagar ou receber.
+- `VehicleHistory`: histórico de atendimento do veículo.
+- `ServiceCatalogItem`: serviço catalogado com precificação e regras.
 
 ### Regras Importantes
 
-- Um veiculo deve pertencer ao cliente informado em orcamentos e ordens de servico.
-- Orcamentos so podem ser atualizados enquanto estao `PENDENTE`.
-- Orcamentos so podem ser aprovados ou reprovados se estiverem `PENDENTE`.
-- Apenas orcamentos `APROVADO` podem ser convertidos em OS.
-- Um orcamento nao pode ser convertido mais de uma vez.
-- A OS segue transicoes controladas de status.
-- A entrega (`ENTREGUE`) so pode ocorrer apos finalizacao (`FINALIZADA`).
-- Pecas adicionadas em OS consomem estoque.
-- O sistema bloqueia consumo quando o estoque e insuficiente.
-- Ao finalizar OS, o historico do veiculo e criado ou atualizado.
-- Ao entregar OS, o backend cria uma conta a receber quando houver valor positivo e ainda nao existir uma.
-- Clientes sao inativados via soft delete (`isActive=false`).
+- Um veículo deve pertencer ao cliente informado em orçamentos e ordens de serviço.
+- Orçamentos só podem ser atualizados enquanto estão `PENDENTE`.
+- Orçamentos só podem ser aprovados ou reprovados se estiverem `PENDENTE`.
+- Apenas orçamentos `APROVADO` podem ser convertidos em OS.
+- Um orçamento não pode ser convertido mais de uma vez.
+- A OS segue transições controladas de status.
+- A entrega (`ENTREGUE`) só pode ocorrer após finalização (`FINALIZADA`).
+- Peças adicionadas em OS consomem estoque.
+- O sistema bloqueia consumo quando o estoque é insuficiente.
+- Ao finalizar OS, o histórico do veículo é criado ou atualizado.
+- Ao entregar OS, o backend cria uma conta a receber quando houver valor positivo e ainda não existir uma.
+- Clientes são inativados via soft delete (`isActive=false`).
 
-## 8. Banco De Dados
+## 8. Banco de Dados
 
-O banco e modelado em Prisma usando PostgreSQL.
+O banco é modelado em Prisma usando PostgreSQL.
 
 ### Enums
 
@@ -219,46 +219,46 @@ O banco e modelado em Prisma usando PostgreSQL.
 - `ServiceMaterialSource`: `SHOP_SUPPLIES`, `CUSTOMER_SUPPLIES`, `NO_PARTS_REQUIRED`, `FLEXIBLE`.
 - `InventoryMovementType`: `OUT`, `ADJUSTMENT`.
 
-### Constraints E Relacionamentos Relevantes
+### Restrições e Relacionamentos Relevantes
 
-- `User.email` e unico.
-- `Client.document` e unico quando informado.
-- `Vehicle.plate` e unico.
+- `User.email` é único.
+- `Client.document` é único quando informado.
+- `Vehicle.plate` é único.
 - `Vehicle` possui unique composto `[id, clientId]`.
-- `Budget.code` e unico.
-- `Budget.vehicle` referencia o par `[vehicleId, clientId]`, garantindo coerencia cliente-veiculo.
-- `ServiceOrder.orderNumber` e unico.
-- `ServiceOrder.budgetId` e unico e opcional.
-- `ServiceOrder.vehicle` tambem referencia `[vehicleId, clientId]`.
+- `Budget.code` é único.
+- `Budget.vehicle` referencia o par `[vehicleId, clientId]`, garantindo coerência cliente-veículo.
+- `ServiceOrder.orderNumber` é único.
+- `ServiceOrder.budgetId` é único e opcional.
+- `ServiceOrder.vehicle` também referencia `[vehicleId, clientId]`.
 - `ServiceOrderPart` possui unique composto `[serviceOrderId, inventoryItemId]`.
-- `InventoryItem.internalCode` e unico.
-- `ServiceCatalogItem.code` e unico.
-- `VehicleHistory.serviceOrderId` e unico quando vinculado.
+- `InventoryItem.internalCode` é único.
+- `ServiceCatalogItem.code` é único.
+- `VehicleHistory.serviceOrderId` é único quando vinculado.
 
 ### Migrations
 
 Existem migrations em `prisma/migrations`, incluindo:
 
-- inicializacao do schema;
-- remocao de campo de chassis de veiculo;
-- criacao de catalogo de servicos;
-- remocao de tempo estimado do catalogo;
-- vinculo entre itens de orcamento e catalogo;
-- renumeracao sequencial de ordens de servico;
-- vinculos financeiros e de estoque;
-- adicao de movimentacoes de inventario.
+- inicialização do schema;
+- remoção de campo de chassi de veículo;
+- criação de catálogo de serviços;
+- remoção de tempo estimado do catálogo;
+- vínculo entre itens de orçamento e catálogo;
+- renumeração sequencial de ordens de serviço;
+- vínculos financeiros e de estoque;
+- adição de movimentações de inventário.
 
 ### Seed
 
-O seed (`prisma/seed.ts`) cria um usuario administrador somente se as variaveis abaixo estiverem definidas:
+O seed (`prisma/seed.ts`) cria um usuário administrador somente se as variáveis abaixo estiverem definidas:
 
 - `SEED_ADMIN_EMAIL`
 - `SEED_ADMIN_PASSWORD`
 - `SEED_ADMIN_NAME`
 
-Se o e-mail ja existir, o usuario nao e recriado.
+Se o e-mail já existir, o usuário não é recriado.
 
-## 9. Autenticacao E Autorizacao
+## 9. Autenticação e Autorização
 
 ### Login
 
@@ -287,25 +287,25 @@ Resposta:
 
 ### JWT
 
-O token contem:
+O token contém:
 
-- `sub`: id do usuario;
+- `sub`: id do usuário;
 - `email`: e-mail;
 - `role`: papel de acesso.
 
 A `JwtStrategy` valida:
 
 - assinatura com `JWT_SECRET`;
-- expiracao;
+- expiração;
 - issuer;
 - audience;
-- existencia do usuario;
-- usuario ativo;
-- compatibilidade entre `payload.sub` e usuario encontrado por e-mail.
+- existência do usuário;
+- usuário ativo;
+- compatibilidade entre `payload.sub` e usuário encontrado por e-mail.
 
-### Autorizacao
+### Autorização
 
-A autorizacao usa:
+A autorização usa:
 
 - `JwtAuthGuard` para exigir Bearer token;
 - `RolesGuard` para verificar roles exigidas via `@Roles(...)`.
@@ -315,7 +315,7 @@ Mensagem de acesso negado:
 ```json
 {
   "statusCode": 403,
-  "message": "Voce nao tem permissao para acessar este recurso",
+  "message": "Você não tem permissão para acessar este recurso",
   "path": "/api/v1/recurso",
   "timestamp": "2026-05-06T12:00:00.000Z"
 }
@@ -323,20 +323,20 @@ Mensagem de acesso negado:
 
 ## 10. Endpoints / API
 
-As rotas usam prefixo global e versionamento. Com `.env.example`, a base e:
+As rotas usam prefixo global e versionamento. Com `.env.example`, a base é:
 
 ```text
 http://localhost:3000/api/v1
 ```
 
-O healthcheck e registrado como `@Controller('health')`. Como o versionamento global por URI esta habilitado com versao padrao `1`, a rota esperada no padrao do projeto e `GET /api/v1/health`.
+O healthcheck é registrado como `@Controller('health')`. Como o versionamento global por URI está habilitado com versão padrão `1`, a rota esperada no padrão do projeto é `GET /api/v1/health`.
 
 ### Auth
 
 #### `POST /auth/login`
 
-- Autenticacao: nao exige JWT.
-- Rate limit especifico: 5 requisicoes por 60 segundos.
+- Autenticação: não exige JWT.
+- Rate limit específico: 5 requisições por 60 segundos.
 - Body:
 
 ```json
@@ -346,13 +346,13 @@ O healthcheck e registrado como `@Controller('health')`. Como o versionamento gl
 }
 ```
 
-- Erros: `400` payload invalido, `401` credenciais invalidas, `429` rate limit.
+- Erros: `400` payload inválido, `401` credenciais inválidas, `429` rate limit.
 
 #### `POST /auth/register`
 
-- Autenticacao: JWT.
+- Autenticação: JWT.
 - Roles: `ADMIN`.
-- Cria usuario e retorna token para o usuario criado.
+- Cria usuário e retorna token para o usuário criado.
 
 ```json
 {
@@ -366,25 +366,25 @@ O healthcheck e registrado como `@Controller('health')`. Como o versionamento gl
 
 #### `GET /auth/me`
 
-- Autenticacao: JWT.
-- Retorna usuario autenticado sem `passwordHash`.
+- Autenticação: JWT.
+- Retorna usuário autenticado sem `passwordHash`.
 
 ### Users
 
 Todas as rotas exigem JWT e role `ADMIN`.
 
-| Metodo  | Rota         | Descricao            |
+| Método  | Rota         | Descrição            |
 | ------- | ------------ | -------------------- |
-| `POST`  | `/users`     | Cria usuario interno |
-| `GET`   | `/users`     | Lista usuarios       |
-| `GET`   | `/users/:id` | Obtem usuario por id |
-| `PATCH` | `/users/:id` | Atualiza usuario     |
+| `POST`  | `/users`     | Cria usuário interno |
+| `GET`   | `/users`     | Lista usuários       |
+| `GET`   | `/users/:id` | Obtém usuário por id |
+| `PATCH` | `/users/:id` | Atualiza usuário     |
 
 Query de listagem: `page`, `limit`, `search`, `sortBy`, `sortOrder`, `role`, `active`.
 
-Campos ordenaveis: `name`, `email`, `role`, `createdAt`, `updatedAt`, `lastLoginAt`.
+Campos ordenáveis: `name`, `email`, `role`, `createdAt`, `updatedAt`, `lastLoginAt`.
 
-Body de criacao:
+Body de criação:
 
 ```json
 {
@@ -396,39 +396,39 @@ Body de criacao:
 }
 ```
 
-Erros relevantes: `409 Usuario ja existe`, `404 Usuario nao encontrado`.
+Erros relevantes: `409 Usuário já existe`, `404 Usuário não encontrado`.
 
 ### Mechanics
 
 Todas as rotas exigem JWT e role `ADMIN`.
 
-| Metodo  | Rota             | Descricao             |
+| Método  | Rota             | Descrição             |
 | ------- | ---------------- | --------------------- |
-| `POST`  | `/mechanics`     | Cria mecanico interno |
-| `GET`   | `/mechanics`     | Lista mecanicos       |
-| `GET`   | `/mechanics/:id` | Obtem mecanico        |
-| `PATCH` | `/mechanics/:id` | Atualiza mecanico     |
+| `POST`  | `/mechanics`     | Cria mecânico interno |
+| `GET`   | `/mechanics`     | Lista mecânicos       |
+| `GET`   | `/mechanics/:id` | Obtém mecânico        |
+| `PATCH` | `/mechanics/:id` | Atualiza mecânico     |
 
 Body:
 
 ```json
 {
-  "name": "Joao Mecanico",
+  "name": "João Mecânico",
   "isActive": true
 }
 ```
 
-Observacao: o backend gera e-mail interno no formato aproximado `nome.timestamp@internal.local` e uma senha interna aleatoria, mas a resposta sanitizada nao retorna a senha gerada.
+Observação: o backend gera e-mail interno no formato aproximado `nome.timestamp@internal.local` e uma senha interna aleatória, mas a resposta sanitizada não retorna a senha gerada.
 
 ### Clients
 
 Exige JWT e `ADMIN` ou `ATENDENTE`.
 
-| Metodo   | Rota           | Descricao                  |
+| Método   | Rota           | Descrição                  |
 | -------- | -------------- | -------------------------- |
 | `POST`   | `/clients`     | Cria cliente               |
 | `GET`    | `/clients`     | Lista clientes             |
-| `GET`    | `/clients/:id` | Obtem cliente com veiculos |
+| `GET`    | `/clients/:id` | Obtém cliente com veículos |
 | `PATCH`  | `/clients/:id` | Atualiza cliente           |
 | `DELETE` | `/clients/:id` | Inativa cliente            |
 
@@ -446,19 +446,19 @@ Body:
 
 Listagem suporta `page`, `limit`, `search`, `sortBy`, `sortOrder`.
 
-Campos ordenaveis: `name`, `createdAt`, `updatedAt`.
+Campos ordenáveis: `name`, `createdAt`, `updatedAt`.
 
-Erros relevantes: documento duplicado, cliente nao encontrado.
+Erros relevantes: documento duplicado, cliente não encontrado.
 
 ### Vehicles
 
-| Metodo                      | Rota                 | Roles                            |
+| Método                      | Rota                 | Roles                            |
 | --------------------------- | -------------------- | -------------------------------- |
-| `POST /vehicles`            | Cria veiculo         | `ADMIN`, `ATENDENTE`             |
-| `GET /vehicles`             | Lista veiculos       | `ADMIN`, `ATENDENTE`             |
-| `GET /vehicles/:id`         | Obtem veiculo        | `ADMIN`, `ATENDENTE`, `MECANICO` |
-| `PATCH /vehicles/:id`       | Atualiza veiculo     | `ADMIN`, `ATENDENTE`             |
-| `GET /vehicles/:id/history` | Historico do veiculo | `ADMIN`, `ATENDENTE`, `MECANICO` |
+| `POST /vehicles`            | Cria veículo         | `ADMIN`, `ATENDENTE`             |
+| `GET /vehicles`             | Lista veículos       | `ADMIN`, `ATENDENTE`             |
+| `GET /vehicles/:id`         | Obtém veículo        | `ADMIN`, `ATENDENTE`, `MECANICO` |
+| `PATCH /vehicles/:id`       | Atualiza veículo     | `ADMIN`, `ATENDENTE`             |
+| `GET /vehicles/:id/history` | Histórico do veículo | `ADMIN`, `ATENDENTE`, `MECANICO` |
 
 Body:
 
@@ -472,41 +472,41 @@ Body:
   "color": "Prata",
   "mileage": 50000,
   "fuel": "Flex",
-  "notes": "Revisao preventiva"
+  "notes": "Revisão preventiva"
 }
 ```
 
 Regras:
 
-- placa e armazenada em uppercase;
-- placa deve ser unica;
+- placa é armazenada em uppercase;
+- placa deve ser única;
 - cliente informado deve existir e estar ativo.
 
 ### Budgets
 
-| Metodo                                       | Rota               | Roles                              |
+| Método                                       | Rota               | Roles                              |
 | -------------------------------------------- | ------------------ | ---------------------------------- |
-| `POST /budgets`                              | Cria orcamento     | `ADMIN`, `ATENDENTE`               |
-| `GET /budgets`                               | Lista orcamentos   | `ADMIN`, `ATENDENTE`, `FINANCEIRO` |
-| `GET /budgets/:id`                           | Obtem orcamento    | `ADMIN`, `ATENDENTE`, `FINANCEIRO` |
-| `PATCH /budgets/:id`                         | Atualiza orcamento | `ADMIN`, `ATENDENTE`               |
-| `PATCH /budgets/:id/approve`                 | Aprova orcamento   | `ADMIN`, `ATENDENTE`               |
-| `PATCH /budgets/:id/reject`                  | Reprova orcamento  | `ADMIN`, `ATENDENTE`               |
+| `POST /budgets`                              | Cria orçamento     | `ADMIN`, `ATENDENTE`               |
+| `GET /budgets`                               | Lista orçamentos   | `ADMIN`, `ATENDENTE`, `FINANCEIRO` |
+| `GET /budgets/:id`                           | Obtém orçamento    | `ADMIN`, `ATENDENTE`, `FINANCEIRO` |
+| `PATCH /budgets/:id`                         | Atualiza orçamento | `ADMIN`, `ATENDENTE`               |
+| `PATCH /budgets/:id/approve`                 | Aprova orçamento   | `ADMIN`, `ATENDENTE`               |
+| `PATCH /budgets/:id/reject`                  | Reprova orçamento  | `ADMIN`, `ATENDENTE`               |
 | `POST /budgets/:id/convert-to-service-order` | Converte em OS     | `ADMIN`, `ATENDENTE`               |
 
-Body de criacao:
+Body de criação:
 
 ```json
 {
   "clientId": "uuid",
   "vehicleId": "uuid",
   "problemDescription": "Barulho ao frear",
-  "notes": "Cliente solicitou urgencia",
+  "notes": "Cliente solicitou urgência",
   "discount": 50,
   "items": [
     {
       "type": "LABOR",
-      "description": "Diagnostico e troca de pastilhas",
+      "description": "Diagnóstico e troca de pastilhas",
       "serviceCatalogItemId": "uuid",
       "quantity": 1,
       "unitPrice": 250
@@ -525,16 +525,16 @@ Body de criacao:
 Regras:
 
 - `items` deve ter pelo menos um item.
-- `discount` nao pode ser maior que o subtotal.
+- `discount` não pode ser maior que o subtotal.
 - `vehicleId` deve pertencer ao `clientId`.
-- itens `LABOR` e `LABOR_AND_PART` podem referenciar servico ativo do catalogo.
-- itens `PART` e `LABOR_AND_PART` exigem item de estoque valido quando usam peca.
-- codigo do orcamento e gerado como `BUD-${Date.now()}`.
-- atualizacao so e permitida quando o orcamento esta `PENDENTE`.
-- aprovacao e reprovacao so sao permitidas quando esta `PENDENTE`.
-- conversao so e permitida quando esta `APROVADO`.
+- itens `LABOR` e `LABOR_AND_PART` podem referenciar serviço ativo do catálogo.
+- itens `PART` e `LABOR_AND_PART` exigem item de estoque válido quando usam peça.
+- código do orçamento é gerado como `BUD-${Date.now()}`.
+- atualização só é permitida quando o orçamento está `PENDENTE`.
+- aprovação e reprovação só são permitidas quando está `PENDENTE`.
+- conversão só é permitida quando está `APROVADO`.
 
-Resposta de conversao:
+Resposta de conversão:
 
 ```json
 {
@@ -550,17 +550,17 @@ Resposta de conversao:
 
 ### Service Orders
 
-| Metodo                             | Rota               | Roles                                          |
+| Método                             | Rota               | Roles                                          |
 | ---------------------------------- | ------------------ | ---------------------------------------------- |
 | `POST /service-orders`             | Cria OS            | `ADMIN`, `ATENDENTE`                           |
 | `GET /service-orders`              | Lista OS           | `ADMIN`, `ATENDENTE`, `MECANICO`, `FINANCEIRO` |
-| `GET /service-orders/:id`          | Obtem OS detalhada | `ADMIN`, `ATENDENTE`, `MECANICO`, `FINANCEIRO` |
+| `GET /service-orders/:id`          | Obtém OS detalhada | `ADMIN`, `ATENDENTE`, `MECANICO`, `FINANCEIRO` |
 | `PATCH /service-orders/:id`        | Atualiza OS        | `ADMIN`, `ATENDENTE`, `MECANICO`               |
 | `PATCH /service-orders/:id/status` | Atualiza status    | `ADMIN`, `ATENDENTE`, `MECANICO`               |
-| `POST /service-orders/:id/parts`   | Adiciona peca      | `ADMIN`, `ATENDENTE`, `MECANICO`               |
-| `GET /service-orders/:id/parts`    | Lista pecas da OS  | `ADMIN`, `ATENDENTE`, `MECANICO`, `FINANCEIRO` |
+| `POST /service-orders/:id/parts`   | Adiciona peça      | `ADMIN`, `ATENDENTE`, `MECANICO`               |
+| `GET /service-orders/:id/parts`    | Lista peças da OS  | `ADMIN`, `ATENDENTE`, `MECANICO`, `FINANCEIRO` |
 
-Body de criacao:
+Body de criação:
 
 ```json
 {
@@ -569,14 +569,14 @@ Body de criacao:
   "mechanicId": "uuid",
   "problemDescription": "Motor falhando",
   "diagnosis": "Falha em velas",
-  "servicesPerformed": "Aguardando execucao",
+  "servicesPerformed": "Aguardando execução",
   "vehicleChecklist": "Sem avarias aparentes",
   "expectedDeliveryAt": "2026-05-10",
   "notes": "Cliente pediu contato antes da troca"
 }
 ```
 
-Atualizacao de status:
+Atualização de status:
 
 ```json
 {
@@ -584,14 +584,14 @@ Atualizacao de status:
 }
 ```
 
-Transicoes permitidas:
+Transições permitidas:
 
 - `ABERTA` -> `ABERTA`, `EM_ANDAMENTO`, `FINALIZADA`
 - `EM_ANDAMENTO` -> `EM_ANDAMENTO`, `FINALIZADA`
 - `FINALIZADA` -> `FINALIZADA`, `ENTREGUE`
 - `ENTREGUE` -> `ENTREGUE`
 
-Adicao de peca:
+Adição de peça:
 
 ```json
 {
@@ -603,28 +603,28 @@ Adicao de peca:
 
 Regras:
 
-- OS recebe numero sequencial `OS000001`, `OS000002`, etc.
-- `expectedDeliveryAt` deve ser uma data valida, com ano de 4 digitos, e nao pode ser anterior ao dia atual.
-- ao adicionar peca, o estoque e decrementado;
-- se a peca ja existir na OS, a quantidade e acumulada;
-- ao finalizar OS com orcamento, itens de estoque do orcamento sao consumidos se ainda nao estiverem em `ServiceOrderPart`;
-- ao finalizar OS, historico do veiculo e registrado;
-- ao entregar OS, uma conta a receber e criada quando houver valor positivo.
+- OS recebe número sequencial `OS000001`, `OS000002`, etc.
+- `expectedDeliveryAt` deve ser uma data válida, com ano de 4 dígitos, e não pode ser anterior ao dia atual.
+- ao adicionar peça, o estoque é decrementado;
+- se a peça já existir na OS, a quantidade é acumulada;
+- ao finalizar OS com orçamento, itens de estoque do orçamento são consumidos se ainda não estiverem em `ServiceOrderPart`;
+- ao finalizar OS, histórico do veículo é registrado;
+- ao entregar OS, uma conta a receber é criada quando houver valor positivo.
 
-Observacao: ao validar `mechanicId`, o codigo verifica se o usuario existe, mas nao confirma explicitamente que a role e `MECANICO`.
+Observação: ao validar `mechanicId`, o código verifica se o usuário existe, mas não confirma explicitamente que a role é `MECANICO`.
 
 ### Services / Service Catalog
 
 Base: `/services`.
 
-| Metodo                           | Rota                     | Roles                                          |
+| Método                           | Rota                     | Roles                                          |
 | -------------------------------- | ------------------------ | ---------------------------------------------- |
-| `POST /services`                 | Cria servico do catalogo | `ADMIN`, `ATENDENTE`                           |
-| `GET /services`                  | Lista servicos           | `ADMIN`, `ATENDENTE`, `MECANICO`, `FINANCEIRO` |
-| `GET /services/:id`              | Obtem servico            | `ADMIN`, `ATENDENTE`, `MECANICO`, `FINANCEIRO` |
-| `PATCH /services/:id`            | Atualiza servico         | `ADMIN`, `ATENDENTE`                           |
-| `PATCH /services/:id/activate`   | Ativa servico            | `ADMIN`, `ATENDENTE`                           |
-| `PATCH /services/:id/deactivate` | Inativa servico          | `ADMIN`, `ATENDENTE`                           |
+| `POST /services`                 | Cria serviço do catálogo | `ADMIN`, `ATENDENTE`                           |
+| `GET /services`                  | Lista serviços           | `ADMIN`, `ATENDENTE`, `MECANICO`, `FINANCEIRO` |
+| `GET /services/:id`              | Obtém serviço            | `ADMIN`, `ATENDENTE`, `MECANICO`, `FINANCEIRO` |
+| `PATCH /services/:id`            | Atualiza serviço         | `ADMIN`, `ATENDENTE`                           |
+| `PATCH /services/:id/activate`   | Ativa serviço            | `ADMIN`, `ATENDENTE`                           |
+| `PATCH /services/:id/deactivate` | Inativa serviço          | `ADMIN`, `ATENDENTE`                           |
 
 Body:
 
@@ -633,7 +633,7 @@ Body:
   "code": "SRV-FREIO",
   "name": "Troca de pastilhas",
   "category": "Freios",
-  "description": "Servico de substituicao de pastilhas",
+  "description": "Serviço de substituição de pastilhas",
   "internalNotes": "Validar disco",
   "laborPrice": 200,
   "productPrice": 180,
@@ -647,32 +647,32 @@ Body:
 Regras:
 
 - se `code` for omitido, gera `SRV-000001`, `SRV-000002`, etc.;
-- `code` e normalizado para uppercase;
-- `name`, `category`, `description` e `internalNotes` sao aparados;
+- `code` é normalizado para uppercase;
+- `name`, `category`, `description` e `internalNotes` são aparados;
 - `suggestedTotalPrice = laborPrice + productPrice`;
-- `code` deve ser unico;
-- `name` deve ser unico dentro da categoria, de forma case-insensitive;
+- `code` deve ser único;
+- `name` deve ser único dentro da categoria, de forma case-insensitive;
 - `LABOR_ONLY` exige `productPrice = 0`;
-- `LABOR_ONLY` nao pode usar `materialSource=SHOP_SUPPLIES`;
+- `LABOR_ONLY` não pode usar `materialSource=SHOP_SUPPLIES`;
 - `NO_PARTS_REQUIRED` exige `productPrice = 0`;
-- `PARTS_AND_LABOR` nao pode usar `NO_PARTS_REQUIRED`.
+- `PARTS_AND_LABOR` não pode usar `NO_PARTS_REQUIRED`.
 
 ### Inventory
 
-| Metodo                            | Rota                          | Roles                              |
+| Método                            | Rota                          | Roles                              |
 | --------------------------------- | ----------------------------- | ---------------------------------- |
 | `POST /inventory`                 | Cria item de estoque          | `ADMIN`, `ATENDENTE`               |
 | `GET /inventory`                  | Lista itens                   | `ADMIN`, `ATENDENTE`, `FINANCEIRO` |
 | `GET /inventory/alerts/low-stock` | Alertas de baixo estoque      | `ADMIN`, `ATENDENTE`               |
-| `GET /inventory/:id/movements`    | Ultimas movimentacoes do item | `ADMIN`, `ATENDENTE`, `FINANCEIRO` |
-| `GET /inventory/:id`              | Obtem item                    | `ADMIN`, `ATENDENTE`, `FINANCEIRO` |
+| `GET /inventory/:id/movements`    | Últimas movimentações do item | `ADMIN`, `ATENDENTE`, `FINANCEIRO` |
+| `GET /inventory/:id`              | Obtém item                    | `ADMIN`, `ATENDENTE`, `FINANCEIRO` |
 | `PATCH /inventory/:id`            | Atualiza item                 | `ADMIN`, `ATENDENTE`               |
 
 Body:
 
 ```json
 {
-  "name": "Filtro de oleo",
+  "name": "Filtro de óleo",
   "internalCode": "P-FILTRO-001",
   "category": "Filtros",
   "supplier": "Fornecedor X",
@@ -686,30 +686,30 @@ Body:
 Regras:
 
 - se `internalCode` for omitido, gera `P-000001`, `P-000002`, etc.;
-- codigo interno deve ser unico;
-- alteracao manual de quantidade gera movimentacao `ADJUSTMENT`;
-- consumo em OS gera movimentacao `OUT`;
-- estoque baixo e calculado quando `quantity <= minimumQuantity * 1.5`;
-- endpoint de movimentacoes retorna ate 8 registros mais recentes.
+- código interno deve ser único;
+- alteração manual de quantidade gera movimentação `ADJUSTMENT`;
+- consumo em OS gera movimentação `OUT`;
+- estoque baixo é calculado quando `quantity <= minimumQuantity * 1.5`;
+- endpoint de movimentações retorna até 8 registros mais recentes.
 
 ### Financial
 
-| Metodo                     | Rota                | Roles                 |
+| Método                     | Rota                | Roles                 |
 | -------------------------- | ------------------- | --------------------- |
-| `POST /financial`          | Cria lancamento     | `ADMIN`, `FINANCEIRO` |
-| `GET /financial`           | Lista lancamentos   | `ADMIN`, `FINANCEIRO` |
+| `POST /financial`          | Cria lançamento     | `ADMIN`, `FINANCEIRO` |
+| `GET /financial`           | Lista lançamentos   | `ADMIN`, `FINANCEIRO` |
 | `GET /financial/summary`   | Resumo financeiro   | `ADMIN`, `FINANCEIRO` |
-| `GET /financial/:id`       | Obtem lancamento    | `ADMIN`, `FINANCEIRO` |
-| `PATCH /financial/:id`     | Atualiza lancamento | `ADMIN`, `FINANCEIRO` |
+| `GET /financial/:id`       | Obtém lançamento    | `ADMIN`, `FINANCEIRO` |
+| `PATCH /financial/:id`     | Atualiza lançamento | `ADMIN`, `FINANCEIRO` |
 | `PATCH /financial/:id/pay` | Marca como pago     | `ADMIN`, `FINANCEIRO` |
 
-Body de criacao:
+Body de criação:
 
 ```json
 {
   "type": "RECEIVABLE",
   "description": "Pagamento OS000001",
-  "category": "Ordem de Servico",
+  "category": "Ordem de Serviço",
   "amount": 430,
   "dueDate": "2026-05-10",
   "paymentMethod": "PIX",
@@ -730,10 +730,10 @@ Pagamento:
 
 Regras:
 
-- se `dueDate` for anterior ao momento atual, status inicial e `VENCIDO`; caso contrario, `PENDENTE`;
-- listagem e consulta sincronizam lancamentos pendentes vencidos;
-- lancamentos `PAGO` nao podem ser atualizados;
-- lancamento ja pago nao pode ser pago novamente;
+- se `dueDate` for anterior ao momento atual, status inicial é `VENCIDO`; caso contrário, `PENDENTE`;
+- listagem e consulta sincronizam lançamentos pendentes vencidos;
+- lançamentos `PAGO` não podem ser atualizados;
+- lançamento já pago não pode ser pago novamente;
 - se `clientId` e `serviceOrderId` forem informados, o cliente deve ser o mesmo da OS.
 
 Resumo financeiro retorna:
@@ -750,7 +750,7 @@ Resumo financeiro retorna:
 #### `GET /dashboard/summary`
 
 - Roles: `ADMIN`, `ATENDENTE`, `FINANCEIRO`.
-- Retorna indicadores de OS, orcamentos, financeiro e estoque.
+- Retorna indicadores de OS, orçamentos, financeiro e estoque.
 
 Exemplo de resposta:
 
@@ -773,7 +773,7 @@ Exemplo de resposta:
     "lowStockItems": [
       {
         "id": "uuid",
-        "name": "Filtro de oleo",
+        "name": "Filtro de óleo",
         "quantity": 4,
         "minimumQuantity": 5,
         "internalCode": "P-000001"
@@ -787,8 +787,8 @@ Exemplo de resposta:
 
 #### `GET /health`
 
-- Autenticacao: nao exige JWT.
-- Retorna status simples da aplicacao.
+- Autenticação: não exige JWT.
+- Retorna status simples da aplicação.
 
 ```json
 {
@@ -797,11 +797,11 @@ Exemplo de resposta:
 }
 ```
 
-Observacao: nao ha verificacao explicita de conectividade com banco nesse endpoint.
+Observação: não há verificação explícita de conectividade com banco nesse endpoint.
 
-## 11. Regras De Validacao
+## 11. Regras de Validação
 
-O `ValidationPipe` global esta configurado com:
+O `ValidationPipe` global está configurado com:
 
 - `whitelist: true`;
 - `forbidNonWhitelisted: true`;
@@ -811,26 +811,26 @@ O `ValidationPipe` global esta configurado com:
 
 Isso significa que:
 
-- campos nao declarados em DTOs sao rejeitados;
-- query params numericos podem ser convertidos;
-- payloads invalidos retornam `400 Bad Request`;
-- detalhes de `target` e `value` nao sao expostos.
+- campos não declarados em DTOs são rejeitados;
+- query params numéricos podem ser convertidos;
+- payloads inválidos retornam `400 Bad Request`;
+- detalhes de `target` e `value` não são expostos.
 
-### Validacoes Relevantes
+### Validações Relevantes
 
-- Senhas de usuario: minimo de 8 caracteres e regex exigindo minuscula, maiuscula e numero.
-- Login: e-mail valido e senha com minimo de 8 caracteres.
-- UUIDs: IDs em body e params usam validacao de UUID.
-- Paginacao: `page >= 1`, `limit` entre 1 e 100.
-- Ordenacao: `sortOrder` aceita apenas `asc` ou `desc`.
-- Valores monetarios: maximo de 2 casas decimais e minimo zero quando aplicavel.
-- Quantidades: inteiros ou numeros positivos conforme DTO.
+- Senhas de usuário: mínimo de 8 caracteres e regex exigindo minúscula, maiúscula e número.
+- Login: e-mail válido e senha com mínimo de 8 caracteres.
+- UUIDs: IDs em body e params usam validação de UUID.
+- Paginação: `page >= 1`, `limit` entre 1 e 100.
+- Ordenação: `sortOrder` aceita apenas `asc` ou `desc`.
+- Valores monetários: máximo de 2 casas decimais e mínimo zero quando aplicável.
+- Quantidades: inteiros ou números positivos conforme DTO.
 - Datas: `IsDateString` para campos de data enviados como string.
-- `expectedDeliveryAt`: validacao adicional de data real, ano com 4 digitos e nao anterior ao dia atual.
+- `expectedDeliveryAt`: validação adicional de data real, ano com 4 dígitos e não anterior ao dia atual.
 
-## 12. Tratamento De Erros
+## 12. Tratamento de Erros
 
-O filtro global `HttpExceptionFilter` captura excecoes e responde no formato:
+O filtro global `HttpExceptionFilter` captura exceções e responde no formato:
 
 ```json
 {
@@ -843,117 +843,117 @@ O filtro global `HttpExceptionFilter` captura excecoes e responde no formato:
 
 Para erros `5xx`, o filtro registra log com:
 
-- excecao;
-- metodo HTTP;
+- exceção;
+- método HTTP;
 - URL.
 
-### Codigos Mais Comuns
+### Códigos Mais Comuns
 
-- `400 Bad Request`: validacao, regra de negocio ou transicao invalida.
-- `401 Unauthorized`: token ausente/invalido ou credenciais invalidas.
-- `403 Forbidden`: role sem permissao.
+- `400 Bad Request`: validação, regra de negócio ou transição inválida.
+- `401 Unauthorized`: token ausente/inválido ou credenciais inválidas.
+- `403 Forbidden`: role sem permissão.
 - `404 Not Found`: recurso inexistente.
 - `409 Conflict`: duplicidade ou conflito de estado.
-- `429 Too Many Requests`: limite de requisicoes excedido.
+- `429 Too Many Requests`: limite de requisições excedido.
 - `500 Internal Server Error`: falha inesperada.
 
-## 13. Seguranca
+## 13. Segurança
 
-### Praticas Implementadas
+### Práticas Implementadas
 
 - JWT Bearer para endpoints protegidos.
 - RBAC por roles.
 - bcrypt para hash de senha.
 - Helmet habilitado globalmente.
-- CORS configuravel.
-- Bloqueio de `CORS_ORIGIN=*` na validacao de ambiente.
+- CORS configurável.
+- Bloqueio de `CORS_ORIGIN=*` na validação de ambiente.
 - Rate limiting global via `ThrottlerGuard`.
 - Throttle mais restritivo em login.
-- `ValidationPipe` com rejeicao de campos extras.
-- Redaction de dados sensiveis em logs.
-- Validacao de `JWT_SECRET`, `JWT_ISSUER`, `JWT_AUDIENCE` e Swagger em producao.
-- Usuarios retornados sem `passwordHash`.
+- `ValidationPipe` com rejeição de campos extras.
+- Redaction de dados sensíveis em logs.
+- Validação de `JWT_SECRET`, `JWT_ISSUER`, `JWT_AUDIENCE` e Swagger em produção.
+- Usuários retornados sem `passwordHash`.
 
-### Pontos De Atencao
+### Pontos de Atenção
 
-- Nao ha refresh token.
-- Nao ha auditoria dedicada.
-- Nao ha MFA.
-- Nao ha policies por propriedade de recurso.
-- Nao ha confirmacao explicita de role `MECANICO` ao associar `mechanicId` em OS.
+- Não há refresh token.
+- Não há auditoria dedicada.
+- Não há MFA.
+- Não há policies por propriedade de recurso.
+- Não há confirmação explícita de role `MECANICO` ao associar `mechanicId` em OS.
 
-## 14. Logs, Observabilidade E Monitoramento
+## 14. Logs, Observabilidade e Monitoramento
 
 O projeto usa `nestjs-pino` com `pino-http`.
 
-Dados sensiveis mascarados:
+Dados sensíveis mascarados:
 
 - `req.headers.authorization`;
 - `req.body.password`;
 - `res.headers["set-cookie"]`.
 
-O nivel de log vem de `LOG_LEVEL`.
+O nível de log vem de `LOG_LEVEL`.
 
-Existe healthcheck simples em `/health`, mas nao ha:
+Existe healthcheck simples em `/health`, mas não há:
 
 - endpoint de readiness/liveness separado;
-- verificacao de banco no healthcheck;
-- metricas Prometheus;
-- tracing distribuido;
-- correlacao explicita por request id no codigo analisado.
+- verificação de banco no healthcheck;
+- métricas Prometheus;
+- tracing distribuído;
+- correlação explícita por request id no código analisado.
 
-## 15. Configuracao Do Ambiente
+## 15. Configuração do Ambiente
 
-Variaveis reais do projeto:
+Variáveis reais do projeto:
 
-| Variavel              | Obrigatoria | Descricao                                 |
+| Variável              | Obrigatória | Descrição                                 |
 | --------------------- | ----------- | ----------------------------------------- |
 | `NODE_ENV`            | Sim         | `development`, `test` ou `production`     |
 | `PORT`                | Sim         | Porta HTTP                                |
-| `APP_NAME`            | Sim         | Nome da aplicacao                         |
-| `APP_VERSION`         | Sim         | Versao da aplicacao                       |
+| `APP_NAME`            | Sim         | Nome da aplicação                         |
+| `APP_VERSION`         | Sim         | Versão da aplicação                       |
 | `API_PREFIX`          | Sim         | Prefixo global da API                     |
 | `DATABASE_URL`        | Sim         | URL PostgreSQL usada pelo Prisma          |
 | `JWT_SECRET`          | Sim         | Segredo de assinatura JWT                 |
-| `JWT_EXPIRES_IN`      | Sim         | Expiracao do token                        |
-| `JWT_ISSUER`          | Producao    | Emissor esperado no JWT                   |
-| `JWT_AUDIENCE`        | Producao    | Audiencia esperada no JWT                 |
+| `JWT_EXPIRES_IN`      | Sim         | Expiração do token                        |
+| `JWT_ISSUER`          | Produção    | Emissor esperado no JWT                   |
+| `JWT_AUDIENCE`        | Produção    | Audiência esperada no JWT                 |
 | `BCRYPT_SALT_ROUNDS`  | Sim         | Custo bcrypt, entre 10 e 15               |
-| `CORS_ORIGIN`         | Sim         | Origens permitidas, separadas por virgula |
-| `CORS_CREDENTIALS`    | Nao         | Habilita credenciais CORS                 |
+| `CORS_ORIGIN`         | Sim         | Origens permitidas, separadas por vírgula |
+| `CORS_CREDENTIALS`    | Não         | Habilita credenciais CORS                 |
 | `THROTTLE_TTL`        | Sim         | Janela de rate limit em segundos          |
-| `THROTTLE_LIMIT`      | Sim         | Limite de requisicoes por janela          |
-| `LOG_LEVEL`           | Sim         | Nivel de log                              |
-| `ENABLE_SWAGGER`      | Nao         | Habilita Swagger fora de producao         |
-| `SEED_ADMIN_EMAIL`    | Nao         | E-mail do admin criado no seed            |
-| `SEED_ADMIN_PASSWORD` | Nao         | Senha do admin criado no seed             |
-| `SEED_ADMIN_NAME`     | Nao         | Nome do admin criado no seed              |
+| `THROTTLE_LIMIT`      | Sim         | Limite de requisições por janela          |
+| `LOG_LEVEL`           | Sim         | Nível de log                              |
+| `ENABLE_SWAGGER`      | Não         | Habilita Swagger fora de produção         |
+| `SEED_ADMIN_EMAIL`    | Não         | e-mail do admin criado no seed            |
+| `SEED_ADMIN_PASSWORD` | Não         | Senha do admin criado no seed             |
+| `SEED_ADMIN_NAME`     | Não         | Nome do admin criado no seed              |
 
-Em producao, a validacao bloqueia:
+Em produção, a validação bloqueia:
 
 - `JWT_SECRET` com menos de 32 caracteres;
 - secrets fracos como `secret`, `changeme`, `change-me`, `jwt-secret`;
-- ausencia de `JWT_ISSUER`;
-- ausencia de `JWT_AUDIENCE`;
+- ausência de `JWT_ISSUER`;
+- ausência de `JWT_AUDIENCE`;
 - `ENABLE_SWAGGER=true`;
 - wildcard em `CORS_ORIGIN`.
 
-## 16. Como Rodar O Projeto
+## 16. Como Rodar o Projeto
 
-### Pre-requisitos
+### Pré-requisitos
 
 - Node.js `>=22.0.0`.
 - npm `>=10.0.0`.
-- PostgreSQL disponivel.
+- PostgreSQL disponível.
 - Docker e Docker Compose, se usar banco em container.
 
-### Instalacao
+### Instalação
 
 ```bash
 npm install
 ```
 
-### Banco Com Docker Compose
+### Banco com Docker Compose
 
 ```bash
 docker compose up -d postgres
@@ -963,17 +963,17 @@ O `docker-compose.yml` define:
 
 - PostgreSQL 16 Alpine;
 - banco `oficina_db`;
-- usuario `postgres`;
+- usuário `postgres`;
 - senha `postgres`;
 - volume `postgres_data`.
 
-### Configuracao Local
+### Configuração Local
 
 ```bash
 cp .env.example .env
 ```
 
-Depois ajuste os valores sensiveis.
+Depois ajuste os valores sensíveis.
 
 ### Prisma
 
@@ -989,19 +989,19 @@ npm run prisma:seed
 npm run start:dev
 ```
 
-API local padrao:
+API local padrão:
 
 ```text
 http://localhost:3000/api/v1
 ```
 
-Swagger, quando habilitado e fora de producao:
+Swagger, quando habilitado e fora de produção:
 
 ```text
 http://localhost:3000/docs
 ```
 
-### Producao
+### Produção
 
 ```bash
 npm run build
@@ -1015,7 +1015,7 @@ npm run start
 docker compose up -d --build
 ```
 
-O servico `api` executa:
+O serviço `api` executa:
 
 ```bash
 npm run prisma:generate && npm run prisma:migrate:deploy && npm run start
@@ -1023,7 +1023,7 @@ npm run prisma:generate && npm run prisma:migrate:deploy && npm run start
 
 ### Scripts
 
-| Script                          | Descricao                     |
+| Script                          | Descrição                     |
 | ------------------------------- | ----------------------------- |
 | `npm run build`                 | Compila NestJS para `dist/`   |
 | `npm run start`                 | Executa `node dist/main.js`   |
@@ -1031,7 +1031,7 @@ npm run prisma:generate && npm run prisma:migrate:deploy && npm run start
 | `npm run start:debug`           | Executa com debug             |
 | `npm run lint`                  | Roda ESLint                   |
 | `npm run format`                | Roda Prettier                 |
-| `npm run test`                  | Testes unitarios              |
+| `npm run test`                  | Testes unitários              |
 | `npm run test:watch`            | Testes em watch               |
 | `npm run test:cov`              | Testes com cobertura          |
 | `npm run test:e2e`              | Testes end-to-end             |
@@ -1042,23 +1042,23 @@ npm run prisma:generate && npm run prisma:migrate:deploy && npm run start
 
 ## 17. Testes
 
-O projeto possui testes unitarios em varios modulos:
+O projeto possui testes unitários em vários módulos:
 
-- autenticacao JWT;
-- validacao de ambiente;
-- validacao de input;
-- utilitarios de data, ordenacao e paginacao;
-- catalogo de servicos;
-- orcamentos;
-- conversao de orcamentos;
-- ordens de servico;
+- autenticação JWT;
+- validação de ambiente;
+- validação de input;
+- utilitários de data, ordenação e paginação;
+- catálogo de serviços;
+- orçamentos;
+- conversão de orçamentos;
+- ordens de serviço;
 - estoque;
 - financeiro;
 - dashboard.
 
-Tambem existe configuracao e teste e2e em `test/`.
+Também existe configuração e teste e2e em `test/`.
 
-### Execucao
+### Execução
 
 ```bash
 npm run test
@@ -1066,49 +1066,49 @@ npm run test:cov
 npm run test:e2e
 ```
 
-### Observacoes
+### Observações
 
-O codigo possui cobertura direcionada para regras importantes, mas a documentacao nao deve assumir cobertura completa de todos os endpoints. Para validar cobertura real, use `npm run test:cov`.
+O código possui cobertura direcionada para regras importantes, mas a documentação não deve assumir cobertura completa de todos os endpoints. Para validar cobertura real, use `npm run test:cov`.
 
-## 18. Boas Praticas E Padroes Do Projeto
+## 18. Boas Práticas e Padrões do Projeto
 
-- Modulos por dominio.
-- DTOs com validacao explicita.
-- Sanitizacao de usuario removendo `passwordHash`.
-- Guards de autenticacao e autorizacao separados.
-- Use-cases para fluxos de negocio mais complexos.
-- Transacoes Prisma para operacoes que alteram multiplas entidades.
-- Ordenacao com allowlist para evitar campos arbitrarios.
-- Paginacao padronizada.
+- Módulos por domínio.
+- DTOs com validação explícita.
+- Sanitização de usuário removendo `passwordHash`.
+- Guards de autenticação e autorização separados.
+- Use-cases para fluxos de negócio mais complexos.
+- Transações Prisma para operações que alteram múltiplas entidades.
+- Ordenação com allowlist para evitar campos arbitrários.
+- Paginação padronizada.
 - Redaction de credenciais em logs.
-- Validacao forte de variaveis de ambiente.
-- Swagger desabilitado em producao por validacao.
+- Validação forte de variáveis de ambiente.
+- Swagger desabilitado em produção por validação.
 
-## 19. Limitacoes Atuais E Melhorias Futuras
+## 19. Limitações Atuais e Melhorias Futuras
 
-Pontos observados no codigo atual:
+Pontos observados no código atual:
 
-- Implementar refresh token e estrategia de renovacao segura.
-- Validar explicitamente que `mechanicId` pertence a um usuario com role `MECANICO`.
+- Implementar refresh token e estratégia de renovação segura.
+- Validar explicitamente que `mechanicId` pertence a um usuário com role `MECANICO`.
 - Criar healthcheck de banco de dados.
-- Adicionar auditoria de acoes sensiveis.
-- Evoluir observabilidade com metricas e tracing.
+- Adicionar auditoria de ações sensíveis.
+- Evoluir observabilidade com métricas e tracing.
 - Avaliar request id/correlation id em logs.
-- Criar politicas por propriedade de recurso, se houver necessidade de isolamento por usuario ou unidade.
-- Revisar fluxo de criacao de mecanico, pois a senha interna gerada nao e exposta nem ha fluxo visivel de primeiro acesso no backend.
-- Considerar endpoints especificos para ajustes de estoque, em vez de depender apenas de `PATCH /inventory/:id`.
+- Criar políticas por propriedade de recurso, se houver necessidade de isolamento por usuário ou unidade.
+- Revisar fluxo de criação de mecânico, pois a senha interna gerada não é exposta nem há fluxo visível de primeiro acesso no backend.
+- Considerar endpoints específicos para ajustes de estoque, em vez de depender apenas de `PATCH /inventory/:id`.
 - Documentar contratos OpenAPI com exemplos mais completos diretamente nos decorators Swagger, se desejado.
 
-## 20. Glossario
+## 20. Glossário
 
-- **OS**: ordem de servico.
-- **Orcamento**: proposta de servicos/pecas para um cliente e veiculo.
-- **Item de orcamento**: linha do orcamento, classificada como peca, mao de obra ou ambos.
-- **Catalogo de servicos**: base de servicos reutilizaveis com regras de preco e material.
-- **Estoque baixo**: item cuja quantidade esta abaixo ou igual a `minimumQuantity * 1.5`.
-- **Lancamento financeiro**: conta a pagar ou receber.
+- **OS**: ordem de serviço.
+- **Orçamento**: proposta de serviços/peças para um cliente e veículo.
+- **Item de orçamento**: linha do orçamento, classificada como peça, mão de obra ou ambos.
+- **Catálogo de serviços**: base de serviços reutilizáveis com regras de preço e material.
+- **Estoque baixo**: item cuja quantidade está abaixo ou igual a `minimumQuantity * 1.5`.
+- **Lançamento financeiro**: conta a pagar ou receber.
 - **Receivable**: valor a receber.
 - **Payable**: valor a pagar.
-- **RBAC**: controle de acesso baseado em papeis.
-- **JWT**: token assinado usado para autenticar requisicoes.
-- **Soft delete**: inativacao logica sem remover registro fisicamente.
+- **RBAC**: controle de acesso baseado em papéis.
+- **JWT**: token assinado usado para autenticar requisições.
+- **Soft delete**: inativação lógica sem remover registro fisicamente.
