@@ -64,6 +64,15 @@ describe('validateEnv security constraints', () => {
     ).toThrow(/ENABLE_SWAGGER/);
   });
 
+  it('should accept Swagger disabled in production', () => {
+    expect(
+      validateEnv({
+        ...baseConfig,
+        ENABLE_SWAGGER: 'false',
+      }).ENABLE_SWAGGER,
+    ).toBe(false);
+  });
+
   it('should accept strong production security configuration', () => {
     expect(validateEnv(baseConfig).JWT_SECRET).toBe(baseConfig.JWT_SECRET);
   });
