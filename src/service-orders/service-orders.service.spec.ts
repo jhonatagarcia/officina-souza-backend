@@ -1,10 +1,14 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { Prisma, ServiceOrderStatus } from '@prisma/client';
+import { Logger } from 'nestjs-pino';
 import { ClientsService } from 'src/clients/clients.service';
 import { InventoryService } from 'src/inventory/inventory.service';
+import { WhatsAppCloudApiService } from 'src/notifications/whatsapp-cloud-api.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ServiceOrderReferenceValidatorService } from 'src/service-orders/services/service-order-reference-validator.service';
+import { ServiceOrderWhatsAppMessageService } from 'src/service-orders/services/service-order-whatsapp-message.service';
 import { ServiceOrdersService } from 'src/service-orders/service-orders.service';
 import { AddServiceOrderPartUseCase } from 'src/service-orders/use-cases/add-service-order-part.use-case';
 import { CreateServiceOrderUseCase } from 'src/service-orders/use-cases/create-service-order.use-case';
@@ -57,6 +61,25 @@ describe('ServiceOrdersService', () => {
   const vehiclesServiceMock = { ensureExists: jest.fn() };
   const inventoryServiceMock = { reserveOrConsumePart: jest.fn() };
   const usersServiceMock = { findById: jest.fn() };
+  const configServiceMock = {
+    get: jest.fn((key: string) => {
+      const values: Record<string, string> = {
+        'whatsapp.accessToken': 'test-token',
+        'whatsapp.phoneNumberId': '123456',
+        'whatsapp.apiVersion': 'v21.0',
+        'whatsapp.templateLanguage': 'en_US',
+        'whatsapp.templates.serviceOrderInProgress': 'hello_world',
+        'whatsapp.templates.serviceOrderFinished': 'hello_world',
+        'whatsapp.templates.serviceOrderDelivered': 'hello_world',
+      };
+
+      return values[key];
+    }),
+  };
+  const loggerMock = {
+    warn: jest.fn(),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
     prismaMock.$transaction.mockImplementation(
@@ -68,10 +91,14 @@ describe('ServiceOrdersService', () => {
       providers: [
         ServiceOrdersService,
         ServiceOrderReferenceValidatorService,
+        ServiceOrderWhatsAppMessageService,
+        WhatsAppCloudApiService,
         CreateServiceOrderUseCase,
         AddServiceOrderPartUseCase,
         UpdateServiceOrderStatusUseCase,
         { provide: PrismaService, useValue: prismaMock },
+        { provide: ConfigService, useValue: configServiceMock },
+        { provide: Logger, useValue: loggerMock },
         { provide: ClientsService, useValue: clientsServiceMock },
         { provide: VehiclesService, useValue: vehiclesServiceMock },
         { provide: InventoryService, useValue: inventoryServiceMock },
@@ -80,6 +107,10 @@ describe('ServiceOrdersService', () => {
     }).compile();
 
     service = moduleRef.get(ServiceOrdersService);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it('should block delivery before finalization', async () => {
@@ -143,6 +174,257 @@ describe('ServiceOrdersService', () => {
     expect(fetchMock).not.toHaveBeenCalled();
 
     fetchMock.mockRestore();
+  });
+
+  it('should send WhatsApp message when status changes to EM_ANDAMENTO', async () => {
+    const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true } as Response);
+    prismaMock.serviceOrder.findUnique
+      .mockResolvedValueOnce({
+        id: 'os-1',
+        status: ServiceOrderStatus.ABERTA,
+      })
+      .mockResolvedValueOnce({
+        id: 'os-1',
+        client: { id: 'client-1', name: 'Maria Silva', phone: '(11) 98765-4321' },
+      });
+    prismaMock.serviceOrder.update.mockResolvedValue({
+      id: 'os-1',
+      status: ServiceOrderStatus.EM_ANDAMENTO,
+    });
+
+    const result = await service.updateStatus('os-1', {
+      status: ServiceOrderStatus.EM_ANDAMENTO,
+    });
+
+    expect(result.whatsappNotification).toEqual({ status: 'SENT' });
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: '5511987654321',
+          type: 'template',
+          template: {
+            name: 'hello_world',
+            language: {
+              code: 'en_US',
+            },
+          },
+        }),
+      }),
+    );
+  });
+
+  it('should send WhatsApp message when status changes to FINALIZADA', async () => {
+    const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true } as Response);
+    prismaMock.serviceOrder.findUnique
+      .mockResolvedValueOnce({
+        id: 'os-1',
+        status: ServiceOrderStatus.EM_ANDAMENTO,
+      })
+      .mockResolvedValueOnce({
+        id: 'os-1',
+        vehicleId: 'vehicle-1',
+        finishedAt: new Date(),
+        problemDescription: 'Falha no freio',
+        servicesPerformed: 'Troca de pastilhas',
+        vehicle: { mileage: 12000 },
+        parts: [],
+        budget: { total: 120 },
+      })
+      .mockResolvedValueOnce({
+        id: 'os-1',
+        client: { id: 'client-1', name: 'Ana Souza', phone: '11987654321' },
+      });
+    prismaMock.serviceOrder.update.mockResolvedValue({
+      id: 'os-1',
+      vehicleId: 'vehicle-1',
+      status: ServiceOrderStatus.FINALIZADA,
+      finishedAt: new Date(),
+    });
+    prismaMock.vehicleHistory.findFirst.mockResolvedValue(null);
+    prismaMock.vehicleHistory.create.mockResolvedValue({ id: 'history-1' });
+
+    const result = await service.updateStatus('os-1', {
+      status: ServiceOrderStatus.FINALIZADA,
+    });
+
+    expect(result.whatsappNotification).toEqual({ status: 'SENT' });
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        body: expect.stringContaining('"name":"hello_world"') as string,
+      }),
+    );
+  });
+
+  it('should send WhatsApp message when status changes to ENTREGUE', async () => {
+    const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true } as Response);
+    const deliveredAt = new Date('2030-01-01T12:00:00.000Z');
+    prismaMock.serviceOrder.findUnique
+      .mockResolvedValueOnce({
+        id: 'os-1',
+        status: ServiceOrderStatus.FINALIZADA,
+      })
+      .mockResolvedValueOnce({
+        id: 'os-1',
+        orderNumber: 'OS-123',
+        clientId: 'client-1',
+        deliveredAt,
+        budget: { total: { lte: () => false } },
+        financialEntries: [],
+      })
+      .mockResolvedValueOnce({
+        id: 'os-1',
+        client: { id: 'client-1', name: 'Cliente', phone: '5511987654321' },
+      });
+    prismaMock.serviceOrder.update.mockResolvedValue({
+      id: 'os-1',
+      status: ServiceOrderStatus.ENTREGUE,
+      deliveredAt,
+    });
+    prismaMock.financialEntry.create.mockResolvedValue({ id: 'fin-1' });
+
+    const result = await service.updateStatus('os-1', {
+      status: ServiceOrderStatus.ENTREGUE,
+    });
+
+    expect(result.whatsappNotification).toEqual({ status: 'SENT' });
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        body: expect.stringContaining('"type":"template"') as string,
+      }),
+    );
+  });
+
+  it('should not send WhatsApp message for non-notifiable status', async () => {
+    const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true } as Response);
+    prismaMock.serviceOrder.findUnique.mockResolvedValueOnce({
+      id: 'os-1',
+      status: ServiceOrderStatus.ABERTA,
+    });
+    prismaMock.serviceOrder.update.mockResolvedValue({
+      id: 'os-1',
+      status: ServiceOrderStatus.ABERTA,
+    });
+
+    const result = await service.updateStatus('os-1', { status: ServiceOrderStatus.ABERTA });
+
+    expect(result.whatsappNotification).toEqual({
+      status: 'SKIPPED',
+      reason: 'STATUS_UNCHANGED',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('should not duplicate Brazil prefix when phone already starts with 55', async () => {
+    const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true } as Response);
+    prismaMock.serviceOrder.findUnique
+      .mockResolvedValueOnce({
+        id: 'os-1',
+        status: ServiceOrderStatus.ABERTA,
+      })
+      .mockResolvedValueOnce({
+        id: 'os-1',
+        client: { id: 'client-1', name: 'Maria Silva', phone: '+55 (11) 98765-4321' },
+      });
+    prismaMock.serviceOrder.update.mockResolvedValue({
+      id: 'os-1',
+      status: ServiceOrderStatus.EM_ANDAMENTO,
+    });
+
+    await service.updateStatus('os-1', { status: ServiceOrderStatus.EM_ANDAMENTO });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        body: expect.stringContaining('"to":"5511987654321"') as string,
+      }),
+    );
+  });
+
+  it('should block WhatsApp send when normalized phone is invalid', async () => {
+    const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true } as Response);
+    prismaMock.serviceOrder.findUnique
+      .mockResolvedValueOnce({
+        id: 'os-1',
+        status: ServiceOrderStatus.ABERTA,
+      })
+      .mockResolvedValueOnce({
+        id: 'os-1',
+        client: { id: 'client-1', name: 'Maria Silva', phone: '123' },
+      });
+    prismaMock.serviceOrder.update.mockResolvedValue({
+      id: 'os-1',
+      status: ServiceOrderStatus.EM_ANDAMENTO,
+    });
+
+    const result = await service.updateStatus('os-1', {
+      status: ServiceOrderStatus.EM_ANDAMENTO,
+    });
+
+    expect(result.whatsappNotification).toEqual({
+      status: 'FAILED',
+      reason: 'CLIENT_PHONE_INVALID',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('should block WhatsApp send when client has no phone', async () => {
+    const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true } as Response);
+    prismaMock.serviceOrder.findUnique
+      .mockResolvedValueOnce({
+        id: 'os-1',
+        status: ServiceOrderStatus.ABERTA,
+      })
+      .mockResolvedValueOnce({
+        id: 'os-1',
+        client: { id: 'client-1', name: 'Maria Silva', phone: null },
+      });
+    prismaMock.serviceOrder.update.mockResolvedValue({
+      id: 'os-1',
+      status: ServiceOrderStatus.EM_ANDAMENTO,
+    });
+
+    const result = await service.updateStatus('os-1', {
+      status: ServiceOrderStatus.EM_ANDAMENTO,
+    });
+
+    expect(result.whatsappNotification).toEqual({
+      status: 'FAILED',
+      reason: 'CLIENT_PHONE_MISSING',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('should keep status update when WhatsApp API fails', async () => {
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({ error: { code: 131026 } }),
+    } as Response);
+    prismaMock.serviceOrder.findUnique
+      .mockResolvedValueOnce({
+        id: 'os-1',
+        status: ServiceOrderStatus.ABERTA,
+      })
+      .mockResolvedValueOnce({
+        id: 'os-1',
+        client: { id: 'client-1', name: 'Maria Silva', phone: '11987654321' },
+      });
+    prismaMock.serviceOrder.update.mockResolvedValue({
+      id: 'os-1',
+      status: ServiceOrderStatus.EM_ANDAMENTO,
+    });
+
+    const result = await service.updateStatus('os-1', {
+      status: ServiceOrderStatus.EM_ANDAMENTO,
+    });
+
+    expect(result.status).toBe(ServiceOrderStatus.EM_ANDAMENTO);
+    expect(result.whatsappNotification).toEqual({ status: 'FAILED', reason: '131026' });
   });
 
   it('should update existing vehicle history instead of creating duplicate entry', async () => {

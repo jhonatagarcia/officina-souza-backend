@@ -79,6 +79,17 @@ export interface ServiceOrderResponseDto {
   updatedAt: Date;
 }
 
+export type ServiceOrderWhatsAppNotificationStatus = 'SENT' | 'SKIPPED' | 'FAILED';
+
+export interface ServiceOrderWhatsAppNotificationDto {
+  status: ServiceOrderWhatsAppNotificationStatus;
+  reason?: string;
+}
+
+export interface ServiceOrderStatusUpdateResponseDto extends ServiceOrderResponseDto {
+  whatsappNotification: ServiceOrderWhatsAppNotificationDto;
+}
+
 export interface ServiceOrderDetailResponseDto extends ServiceOrderResponseDto {
   partsTotal: Prisma.Decimal;
   laborTotal: Prisma.Decimal;

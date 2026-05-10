@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ClientsModule } from 'src/clients/clients.module';
 import { InventoryModule } from 'src/inventory/inventory.module';
+import { WhatsAppCloudApiService } from 'src/notifications/whatsapp-cloud-api.service';
 import { ServiceOrdersController } from 'src/service-orders/service-orders.controller';
 import { ServiceOrderReferenceValidatorService } from 'src/service-orders/services/service-order-reference-validator.service';
+import { ServiceOrderWhatsAppMessageService } from 'src/service-orders/services/service-order-whatsapp-message.service';
 import { ServiceOrdersService } from 'src/service-orders/service-orders.service';
 import { AddServiceOrderPartUseCase } from 'src/service-orders/use-cases/add-service-order-part.use-case';
 import { CreateServiceOrderUseCase } from 'src/service-orders/use-cases/create-service-order.use-case';
@@ -16,6 +18,8 @@ import { VehiclesModule } from 'src/vehicles/vehicles.module';
   providers: [
     ServiceOrdersService,
     ServiceOrderReferenceValidatorService,
+    ServiceOrderWhatsAppMessageService,
+    WhatsAppCloudApiService,
     CreateServiceOrderUseCase,
     AddServiceOrderPartUseCase,
     UpdateServiceOrderStatusUseCase,

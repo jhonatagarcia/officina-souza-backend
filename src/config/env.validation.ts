@@ -84,6 +84,41 @@ class EnvironmentVariables {
   LOG_LEVEL!: string;
 
   @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  WHATSAPP_ACCESS_TOKEN?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  WHATSAPP_PHONE_NUMBER_ID?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  WHATSAPP_API_VERSION?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  WHATSAPP_TEMPLATE_LANGUAGE?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  WHATSAPP_TEMPLATE_SERVICE_ORDER_IN_PROGRESS?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  WHATSAPP_TEMPLATE_SERVICE_ORDER_FINISHED?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  WHATSAPP_TEMPLATE_SERVICE_ORDER_DELIVERED?: string;
+
+  @IsOptional()
   @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
   ENABLE_SWAGGER?: boolean;

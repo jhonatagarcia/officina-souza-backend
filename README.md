@@ -129,6 +129,14 @@ npm run prisma:seed
 
 O seed cria um usuário administrador somente quando `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD` e `SEED_ADMIN_NAME` estiverem definidos. Se o usuário já existir, ele não é recriado.
 
+Para popular a base local com dados de demonstração para screenshots e apresentações:
+
+```bash
+npm run prisma:seed:demo
+```
+
+Esse seed é complementar ao seed de administrador e deve ser usado apenas em ambiente local/demo. Ele cria uma massa idempotente com prefixos `DEMO-` e e-mails `@oficina.local`, incluindo clientes, veículos, catálogo de serviços, estoque, orçamentos, ordens de serviço, histórico e lançamentos financeiros relacionados. Também cria usuários `demo.admin@oficina.local` e `demo.mecanico@oficina.local` com senha `Demo@123456`. Não execute esse script em produção.
+
 ## Execução local
 
 Fluxo recomendado para subir a API localmente:
@@ -214,6 +222,7 @@ O serviço `api` do `docker-compose.yml` executa `prisma:generate`, `prisma:migr
 | `npm run prisma:migrate`        | Aplica/cria migrations em desenvolvimento.                         |
 | `npm run prisma:migrate:deploy` | Aplica migrations existentes em ambientes controlados/produção.    |
 | `npm run prisma:seed`           | Executa o seed de administrador.                                   |
+| `npm run prisma:seed:demo`      | Popula dados locais/demo para apresentações e screenshots.         |
 
 ## Testes
 

@@ -27,6 +27,17 @@ export default () => ({
   logging: {
     level: process.env.LOG_LEVEL,
   },
+  whatsapp: {
+    accessToken: process.env.WHATSAPP_ACCESS_TOKEN,
+    phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID,
+    apiVersion: process.env.WHATSAPP_API_VERSION ?? 'v21.0',
+    templateLanguage: process.env.WHATSAPP_TEMPLATE_LANGUAGE ?? 'pt_BR',
+    templates: {
+      serviceOrderInProgress: process.env.WHATSAPP_TEMPLATE_SERVICE_ORDER_IN_PROGRESS,
+      serviceOrderFinished: process.env.WHATSAPP_TEMPLATE_SERVICE_ORDER_FINISHED,
+      serviceOrderDelivered: process.env.WHATSAPP_TEMPLATE_SERVICE_ORDER_DELIVERED,
+    },
+  },
   swagger: {
     enabled:
       process.env.ENABLE_SWAGGER !== undefined

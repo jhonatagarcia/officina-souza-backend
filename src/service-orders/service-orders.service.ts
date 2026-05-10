@@ -13,6 +13,7 @@ import {
   ServiceOrderListResponseDto,
   ServiceOrderPartResponseDto,
   ServiceOrderResponseDto,
+  ServiceOrderStatusUpdateResponseDto,
   toServiceOrderDetailResponseDto,
   toServiceOrderListResponseDto,
   toServiceOrderPartResponseDto,
@@ -166,10 +167,13 @@ export class ServiceOrdersService {
   async updateStatus(
     id: string,
     updateStatusDto: UpdateServiceOrderStatusDto,
-  ): Promise<ServiceOrderResponseDto> {
-    const serviceOrder = await this.updateServiceOrderStatusUseCase.execute(id, updateStatusDto);
+  ): Promise<ServiceOrderStatusUpdateResponseDto> {
+    const result = await this.updateServiceOrderStatusUseCase.execute(id, updateStatusDto);
 
-    return toServiceOrderResponseDto(serviceOrder);
+    return {
+      ...toServiceOrderResponseDto(result.serviceOrder),
+      whatsappNotification: result.whatsappNotification,
+    };
   }
 
   async addPart(

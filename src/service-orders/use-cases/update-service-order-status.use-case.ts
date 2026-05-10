@@ -7,11 +7,19 @@ import {
   ServiceOrderStatus,
 } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { normalizeBrazilWhatsAppPhone } from 'src/notifications/whatsapp-phone.util';
+import { WhatsAppCloudApiService } from 'src/notifications/whatsapp-cloud-api.service';
+import { ServiceOrderWhatsAppNotificationDto } from 'src/service-orders/dto/service-order-response.dto';
 import { UpdateServiceOrderStatusDto } from 'src/service-orders/dto/update-service-order-status.dto';
+import { ServiceOrderWhatsAppMessageService } from 'src/service-orders/services/service-order-whatsapp-message.service';
 
 @Injectable()
 export class UpdateServiceOrderStatusUseCase {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly whatsAppMessageService: ServiceOrderWhatsAppMessageService,
+    private readonly whatsAppCloudApiService: WhatsAppCloudApiService,
+  ) {}
 
   async execute(id: string, updateStatusDto: UpdateServiceOrderStatusDto) {
     const serviceOrder = await this.prisma.serviceOrder.findUnique({
@@ -23,6 +31,7 @@ export class UpdateServiceOrderStatusUseCase {
     }
 
     this.assertStatusTransition(serviceOrder.status, updateStatusDto.status);
+    const statusChanged = serviceOrder.status !== updateStatusDto.status;
 
     const updateData: Prisma.ServiceOrderUpdateInput = {
       status: updateStatusDto.status,
@@ -57,7 +66,13 @@ export class UpdateServiceOrderStatusUseCase {
       return updated;
     });
 
-    return updatedServiceOrder;
+    const whatsappNotification = await this.notifyClientWhenApplicable(
+      updatedServiceOrder.id,
+      updateStatusDto.status,
+      statusChanged,
+    );
+
+    return { serviceOrder: updatedServiceOrder, whatsappNotification };
   }
 
   private assertStatusTransition(
@@ -88,6 +103,73 @@ export class UpdateServiceOrderStatusUseCase {
     ) {
       throw new BadRequestException('A ordem de servico so pode ser entregue apos a finalizacao');
     }
+  }
+
+  private async notifyClientWhenApplicable(
+    serviceOrderId: string,
+    status: ServiceOrderStatus,
+    statusChanged: boolean,
+  ): Promise<ServiceOrderWhatsAppNotificationDto> {
+    if (!statusChanged) {
+      return { status: 'SKIPPED', reason: 'STATUS_UNCHANGED' };
+    }
+
+    if (!this.whatsAppMessageService.shouldSendForStatus(status)) {
+      return { status: 'SKIPPED', reason: 'STATUS_NOT_NOTIFIABLE' };
+    }
+
+    const serviceOrder = await this.prisma.serviceOrder.findUnique({
+      where: { id: serviceOrderId },
+      include: { client: true },
+    });
+
+    if (!serviceOrder) {
+      return { status: 'FAILED', reason: 'SERVICE_ORDER_NOT_FOUND' };
+    }
+
+    if (!serviceOrder.client) {
+      return { status: 'FAILED', reason: 'CLIENT_NOT_FOUND' };
+    }
+
+    const message = this.whatsAppMessageService.buildStatusMessage(
+      status,
+      serviceOrder.client.name,
+    );
+    const template = this.whatsAppMessageService.buildStatusTemplate(
+      status,
+      serviceOrder.client.name,
+    );
+
+    if (!message?.trim()) {
+      return { status: 'FAILED', reason: 'MESSAGE_NOT_AVAILABLE' };
+    }
+
+    if (!template) {
+      return { status: 'FAILED', reason: 'TEMPLATE_NOT_AVAILABLE' };
+    }
+
+    if (!serviceOrder.client.phone?.trim()) {
+      return { status: 'FAILED', reason: 'CLIENT_PHONE_MISSING' };
+    }
+
+    const phone = normalizeBrazilWhatsAppPhone(serviceOrder.client.phone);
+
+    if (!phone) {
+      return { status: 'FAILED', reason: 'CLIENT_PHONE_INVALID' };
+    }
+
+    const result = await this.whatsAppCloudApiService.sendTemplateMessage({
+      to: phone,
+      templateName: template.name,
+      languageCode: template.languageCode,
+      bodyParameters: template.bodyParameters,
+    });
+
+    if (!result.success) {
+      return { status: 'FAILED', reason: result.errorCode ?? 'WHATSAPP_API_ERROR' };
+    }
+
+    return { status: 'SENT' };
   }
 
   private async registerHistory(serviceOrderId: string, tx: Prisma.TransactionClient) {
