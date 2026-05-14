@@ -13,6 +13,7 @@ import { HttpExceptionFilter } from 'src/common/filters/http-exception.filter';
 import { DashboardModule } from 'src/dashboard/dashboard.module';
 import { FinancialModule } from 'src/financial/financial.module';
 import { InventoryModule } from 'src/inventory/inventory.module';
+import { NotificationsModule } from 'src/notifications/notifications.module';
 import { PrismaModule } from 'src/prisma/prisma.module';
 import { ServiceCatalogModule } from 'src/service-catalog/service-catalog.module';
 import { ServiceOrdersModule } from 'src/service-orders/service-orders.module';
@@ -59,6 +60,7 @@ import { HealthModule } from 'src/health/health.module';
     ServiceCatalogModule,
     ServiceOrdersModule,
     InventoryModule,
+    NotificationsModule,
     FinancialModule,
     DashboardModule,
     HealthModule,

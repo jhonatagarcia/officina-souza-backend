@@ -84,6 +84,9 @@ export type ServiceOrderWhatsAppNotificationStatus = 'SENT' | 'SKIPPED' | 'FAILE
 export interface ServiceOrderWhatsAppNotificationDto {
   status: ServiceOrderWhatsAppNotificationStatus;
   reason?: string;
+  details?: string;
+  providerStatusCode?: number;
+  fbTraceId?: string;
 }
 
 export interface ServiceOrderStatusUpdateResponseDto extends ServiceOrderResponseDto {

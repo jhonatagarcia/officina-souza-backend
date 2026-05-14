@@ -403,7 +403,14 @@ describe('ServiceOrdersService', () => {
     jest.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: false,
       status: 400,
-      json: async () => ({ error: { code: 131026 } }),
+      json: async () => ({
+        error: {
+          code: 131026,
+          message: '(#131026) Message undeliverable',
+          error_data: { details: 'Recipient cannot receive this message' },
+          fbtrace_id: 'trace-1',
+        },
+      }),
     } as Response);
     prismaMock.serviceOrder.findUnique
       .mockResolvedValueOnce({
@@ -424,7 +431,13 @@ describe('ServiceOrdersService', () => {
     });
 
     expect(result.status).toBe(ServiceOrderStatus.EM_ANDAMENTO);
-    expect(result.whatsappNotification).toEqual({ status: 'FAILED', reason: '131026' });
+    expect(result.whatsappNotification).toEqual({
+      status: 'FAILED',
+      reason: '131026',
+      details: 'Recipient cannot receive this message',
+      providerStatusCode: 400,
+      fbTraceId: 'trace-1',
+    });
   });
 
   it('should update existing vehicle history instead of creating duplicate entry', async () => {

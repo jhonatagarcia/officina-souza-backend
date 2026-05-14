@@ -101,7 +101,22 @@ class EnvironmentVariables {
   @IsOptional()
   @IsString()
   @IsNotEmpty()
+  WHATSAPP_WEBHOOK_VERIFY_TOKEN?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  META_APP_SECRET?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
   WHATSAPP_TEMPLATE_LANGUAGE?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  WHATSAPP_TEMPLATE_HEADER_TEXT?: string;
 
   @IsOptional()
   @IsString()

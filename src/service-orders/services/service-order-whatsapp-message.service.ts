@@ -21,10 +21,6 @@ export class ServiceOrderWhatsAppMessageService {
       return null;
     }
 
-    if (status === ServiceOrderStatus.ENTREGUE) {
-      return 'obrigado pela confiança de nossos serviços, volte sempre.';
-    }
-
     const normalizedClientName = clientName?.trim();
     if (!normalizedClientName) {
       return null;
@@ -38,13 +34,22 @@ export class ServiceOrderWhatsAppMessageService {
       return `Olá ${normalizedClientName} o serviço do seu carro esta finalizado, pode vir retirar`;
     }
 
+    if (status === ServiceOrderStatus.ENTREGUE) {
+      return `Olá ${normalizedClientName}, obrigado pela confiança em nossos serviços. Volte sempre.`;
+    }
+
     return null;
   }
 
   buildStatusTemplate(
     status: ServiceOrderStatus,
     clientName?: string | null,
-  ): { name: string; languageCode: string; bodyParameters: string[] } | null {
+  ): {
+    name: string;
+    languageCode: string;
+    headerParameters: string[];
+    bodyParameters: string[];
+  } | null {
     if (!this.shouldSendForStatus(status)) {
       return null;
     }
@@ -57,12 +62,8 @@ export class ServiceOrderWhatsAppMessageService {
       return null;
     }
 
-    if (status === ServiceOrderStatus.ENTREGUE) {
-      return { name, languageCode, bodyParameters: [] };
-    }
-
     if (name === 'hello_world') {
-      return { name, languageCode, bodyParameters: [] };
+      return { name, languageCode, headerParameters: [], bodyParameters: [] };
     }
 
     const normalizedClientName = clientName?.trim();
@@ -70,7 +71,18 @@ export class ServiceOrderWhatsAppMessageService {
       return null;
     }
 
-    return { name, languageCode, bodyParameters: [normalizedClientName] };
+    return {
+      name,
+      languageCode,
+      headerParameters: this.buildHeaderParameters(),
+      bodyParameters: [normalizedClientName],
+    };
+  }
+
+  private buildHeaderParameters(): string[] {
+    const headerText = this.configService.get<string>('whatsapp.templateHeaderText')?.trim();
+
+    return headerText ? [headerText] : [];
   }
 
   private getTemplateName(status: ServiceOrderStatus): string | null {

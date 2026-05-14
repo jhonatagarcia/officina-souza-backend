@@ -11,19 +11,37 @@ export interface WhatsAppTemplateMessageInput {
   to: string;
   templateName: string;
   languageCode: string;
+  headerParameters?: string[];
   bodyParameters?: string[];
 }
 
 export interface WhatsAppSendResult {
   success: boolean;
   errorCode?: string;
+  errorMessage?: string;
+  errorDetails?: string;
+  fbTraceId?: string;
+  providerStatusCode?: number;
 }
 
 interface WhatsAppApiErrorResponse {
   error?: {
     code?: number | string;
     type?: string;
+    message?: string;
+    error_data?: {
+      details?: string;
+    };
+    fbtrace_id?: string;
   };
+}
+
+interface WhatsAppApiError {
+  errorCode: string;
+  errorMessage?: string;
+  errorDetails?: string;
+  fbTraceId?: string;
+  providerStatusCode: number;
 }
 
 @Injectable()
@@ -75,13 +93,19 @@ export class WhatsAppCloudApiService {
         return { success: true };
       }
 
-      const errorCode = await this.resolveSafeErrorCode(response);
+      const apiError = await this.resolveSafeError(response);
       this.logger.warn(
-        { statusCode: response.status, errorCode },
+        {
+          statusCode: apiError.providerStatusCode,
+          errorCode: apiError.errorCode,
+          errorMessage: apiError.errorMessage,
+          errorDetails: apiError.errorDetails,
+          fbTraceId: apiError.fbTraceId,
+        },
         'WhatsApp Cloud API rejected message',
       );
 
-      return { success: false, errorCode };
+      return { success: false, ...apiError };
     } catch (error) {
       this.logger.warn(
         { error: this.getSafeErrorName(error) },
@@ -127,16 +151,31 @@ export class WhatsAppCloudApiService {
             language: {
               code: input.languageCode,
             },
-            ...(input.bodyParameters?.length
+            ...(input.headerParameters?.length || input.bodyParameters?.length
               ? {
                   components: [
-                    {
-                      type: 'body',
-                      parameters: input.bodyParameters.map((parameter) => ({
-                        type: 'text',
-                        text: parameter,
-                      })),
-                    },
+                    ...(input.headerParameters?.length
+                      ? [
+                          {
+                            type: 'header',
+                            parameters: input.headerParameters.map((parameter) => ({
+                              type: 'text',
+                              text: parameter,
+                            })),
+                          },
+                        ]
+                      : []),
+                    ...(input.bodyParameters?.length
+                      ? [
+                          {
+                            type: 'body',
+                            parameters: input.bodyParameters.map((parameter) => ({
+                              type: 'text',
+                              text: parameter,
+                            })),
+                          },
+                        ]
+                      : []),
                   ],
                 }
               : {}),
@@ -148,13 +187,19 @@ export class WhatsAppCloudApiService {
         return { success: true };
       }
 
-      const errorCode = await this.resolveSafeErrorCode(response);
+      const apiError = await this.resolveSafeError(response);
       this.logger.warn(
-        { statusCode: response.status, errorCode },
+        {
+          statusCode: apiError.providerStatusCode,
+          errorCode: apiError.errorCode,
+          errorMessage: apiError.errorMessage,
+          errorDetails: apiError.errorDetails,
+          fbTraceId: apiError.fbTraceId,
+        },
         'WhatsApp Cloud API rejected template message',
       );
 
-      return { success: false, errorCode };
+      return { success: false, ...apiError };
     } catch (error) {
       this.logger.warn(
         { error: this.getSafeErrorName(error) },
@@ -164,14 +209,23 @@ export class WhatsAppCloudApiService {
     }
   }
 
-  private async resolveSafeErrorCode(response: Response): Promise<string> {
+  private async resolveSafeError(response: Response): Promise<WhatsAppApiError> {
     try {
       const body = (await response.json()) as WhatsAppApiErrorResponse;
       const code = body.error?.code ?? body.error?.type;
 
-      return code ? String(code) : `HTTP_${response.status}`;
+      return {
+        errorCode: code ? String(code) : `HTTP_${response.status}`,
+        errorMessage: body.error?.message,
+        errorDetails: body.error?.error_data?.details,
+        fbTraceId: body.error?.fbtrace_id,
+        providerStatusCode: response.status,
+      };
     } catch {
-      return `HTTP_${response.status}`;
+      return {
+        errorCode: `HTTP_${response.status}`,
+        providerStatusCode: response.status,
+      };
     }
   }
 

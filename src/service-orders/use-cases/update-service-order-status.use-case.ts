@@ -162,11 +162,18 @@ export class UpdateServiceOrderStatusUseCase {
       to: phone,
       templateName: template.name,
       languageCode: template.languageCode,
+      headerParameters: template.headerParameters,
       bodyParameters: template.bodyParameters,
     });
 
     if (!result.success) {
-      return { status: 'FAILED', reason: result.errorCode ?? 'WHATSAPP_API_ERROR' };
+      return {
+        status: 'FAILED',
+        reason: result.errorCode ?? 'WHATSAPP_API_ERROR',
+        details: result.errorDetails ?? result.errorMessage,
+        providerStatusCode: result.providerStatusCode,
+        fbTraceId: result.fbTraceId,
+      };
     }
 
     return { status: 'SENT' };

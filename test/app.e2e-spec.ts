@@ -2,6 +2,7 @@
 import { ExecutionContext, INestApplication, ValidationPipe, VersioningType } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
+import { createHmac } from 'crypto';
 import request from 'supertest';
 import { AuthService } from 'src/auth/auth.service';
 import { BudgetConversionsService } from 'src/budget-conversions/budget-conversions.service';
@@ -36,6 +37,8 @@ process.env.CORS_CREDENTIALS = 'false';
 process.env.THROTTLE_TTL = '60';
 process.env.THROTTLE_LIMIT = '100';
 process.env.LOG_LEVEL = 'silent';
+process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN = 'verify-token';
+process.env.META_APP_SECRET = 'app-secret';
 
 describe('AppController (e2e)', () => {
   let app: INestApplication;
@@ -67,6 +70,10 @@ describe('AppController (e2e)', () => {
               cors: { origin: ['http://localhost:3000'], credentials: false },
               throttle: { ttl: 60, limit: 100 },
               logging: { level: 'silent' },
+              whatsapp: {
+                webhookVerifyToken: 'verify-token',
+                appSecret: 'app-secret',
+              },
             }),
           ],
         }),
@@ -172,7 +179,7 @@ describe('AppController (e2e)', () => {
       })
       .compile();
 
-    app = moduleFixture.createNestApplication();
+    app = moduleFixture.createNestApplication({ rawBody: true });
     app.setGlobalPrefix('api');
     app.enableVersioning({
       type: VersioningType.URI,
@@ -371,6 +378,51 @@ describe('AppController (e2e)', () => {
       .expect(200)
       .expect(({ body }) => {
         expect(body.status).toBe('ok');
+      });
+  });
+
+  it('/api/v1/webhooks/whatsapp (GET) should verify Meta challenge', async () => {
+    await request(app.getHttpServer())
+      .get('/api/v1/webhooks/whatsapp')
+      .query({
+        'hub.mode': 'subscribe',
+        'hub.verify_token': 'verify-token',
+        'hub.challenge': 'challenge-123',
+      })
+      .expect(200)
+      .expect('challenge-123');
+  });
+
+  it('/api/v1/webhooks/whatsapp (POST) should receive signed WhatsApp events', async () => {
+    const payload = JSON.stringify({
+      object: 'whatsapp_business_account',
+      entry: [
+        {
+          changes: [
+            {
+              field: 'messages',
+              value: {
+                metadata: { phone_number_id: '123456' },
+                messages: [{ id: 'wamid-1', from: '5511999999999', type: 'text' }],
+              },
+            },
+          ],
+        },
+      ],
+    });
+    const signature = `sha256=${createHmac('sha256', 'app-secret')
+      .update(Buffer.from(payload))
+      .digest('hex')}`;
+
+    await request(app.getHttpServer())
+      .post('/api/v1/webhooks/whatsapp')
+      .set('Content-Type', 'application/json')
+      .set('x-hub-signature-256', signature)
+      .send(payload)
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.received).toBe(true);
+        expect(body.summary.messageCount).toBe(1);
       });
   });
 });

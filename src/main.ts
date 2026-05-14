@@ -11,6 +11,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, {
     bufferLogs: true,
+    rawBody: true,
   });
   const configService = app.get(ConfigService);
   const logger = app.get(Logger);
