@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { Module } from '@nestjs/common';
 import appConfig from 'src/config/app.config';
+import { getEnvFilePath } from 'src/config/env-file-path';
 import { validateEnv } from 'src/config/env.validation';
 import { PrismaModule } from 'src/prisma/prisma.module';
 import { UsersModule } from 'src/users/users.module';
@@ -15,7 +16,7 @@ import { Role } from 'src/common/enums/role.enum';
       isGlobal: true,
       load: [appConfig],
       validate: validateEnv,
-      envFilePath: ['.env'],
+      envFilePath: getEnvFilePath(),
     }),
     PrismaModule,
     UsersModule,

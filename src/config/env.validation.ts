@@ -12,6 +12,14 @@ import {
 import { plainToInstance, Transform } from 'class-transformer';
 import { formatValidationMessages } from 'src/common/utils/validation-messages.util';
 
+function toOptionalNumber(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+
+  return Number(value);
+}
+
 class EnvironmentVariables {
   @IsIn(['development', 'test', 'production'])
   NODE_ENV!: 'development' | 'test' | 'production';
@@ -82,6 +90,57 @@ class EnvironmentVariables {
   @IsString()
   @IsNotEmpty()
   LOG_LEVEL!: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  QUEUE_PREFIX?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  REDIS_HOST?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => toOptionalNumber(value))
+  @IsInt()
+  @Min(1)
+  @Max(65535)
+  REDIS_PORT?: number;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  REDIS_USERNAME?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  REDIS_PASSWORD?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => toOptionalNumber(value))
+  @IsInt()
+  @Min(0)
+  REDIS_DB?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  REDIS_TLS?: boolean;
+
+  @IsOptional()
+  @Transform(({ value }) => toOptionalNumber(value))
+  @IsInt()
+  @Min(1)
+  @Max(20)
+  QUEUE_WHATSAPP_ATTEMPTS?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => toOptionalNumber(value))
+  @IsInt()
+  @Min(100)
+  QUEUE_WHATSAPP_BACKOFF_DELAY_MS?: number;
 
   @IsOptional()
   @IsString()

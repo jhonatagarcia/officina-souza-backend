@@ -27,6 +27,23 @@ export default () => ({
   logging: {
     level: process.env.LOG_LEVEL,
   },
+  queue: {
+    prefix: process.env.QUEUE_PREFIX ?? 'oficina',
+    redis: {
+      host: process.env.REDIS_HOST ?? 'localhost',
+      port: Number(process.env.REDIS_PORT ?? 6379),
+      username: process.env.REDIS_USERNAME,
+      password: process.env.REDIS_PASSWORD,
+      db: Number(process.env.REDIS_DB ?? 0),
+      tls: process.env.REDIS_TLS === 'true',
+    },
+    notifications: {
+      whatsapp: {
+        attempts: Number(process.env.QUEUE_WHATSAPP_ATTEMPTS ?? 5),
+        backoffDelayMs: Number(process.env.QUEUE_WHATSAPP_BACKOFF_DELAY_MS ?? 5000),
+      },
+    },
+  },
   whatsapp: {
     accessToken: process.env.WHATSAPP_ACCESS_TOKEN,
     phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID,

@@ -24,6 +24,8 @@ O projeto foi construído com NestJS, TypeScript, PostgreSQL e Prisma, com foco 
 - NestJS 11
 - TypeScript
 - PostgreSQL 16
+- Redis
+- BullMQ
 - Prisma ORM
 - JWT com Passport
 - bcrypt
@@ -40,8 +42,9 @@ O projeto foi construído com NestJS, TypeScript, PostgreSQL e Prisma, com foco 
 
 - Node.js `>=22.0.0`
 - npm `>=10.0.0`
-- Docker e Docker Compose, caso use o PostgreSQL via container
+- Docker e Docker Compose, caso use PostgreSQL/Redis via container
 - PostgreSQL disponível localmente ou via container
+- Redis disponível localmente ou via container para filas BullMQ
 
 ## Instalação
 
@@ -51,10 +54,10 @@ Instale as dependências:
 npm install
 ```
 
-Suba o PostgreSQL do projeto:
+Suba PostgreSQL e Redis do projeto:
 
 ```bash
-docker compose up -d postgres
+docker compose up -d postgres redis
 ```
 
 Gere o Prisma Client:
@@ -65,13 +68,14 @@ npm run prisma:generate
 
 ## Configuração do ambiente
 
-O projeto carrega variáveis a partir de `.env`. Use `.env.example` como base para criar o arquivo local:
+O projeto usa arquivos separados por ambiente:
 
-```bash
-cp .env.example .env
-```
+- `.env` para localhost/desenvolvimento.
+- `.env.prod` para produção.
 
-O arquivo `.env` real não deve ser versionado. Ele pode conter credenciais, segredos e dados específicos do ambiente. O `.env.example` deve manter apenas placeholders seguros.
+Por padrão, a API usa `.env`. Quando `NODE_ENV=production`, a API usa `.env.prod`. Também é possível forçar outro arquivo com `ENV_FILE=/caminho/do/arquivo.env`.
+
+O arquivo `.env.example` deve manter apenas placeholders seguros. Arquivos reais `.env*` não devem ser versionados, pois podem conter credenciais, segredos e dados específicos do ambiente.
 
 Variáveis obrigatórias validadas na inicialização:
 
@@ -93,15 +97,24 @@ Variáveis obrigatórias validadas na inicialização:
 
 Variáveis opcionais:
 
-| Variável              | Uso                                                                 |
-| --------------------- | ------------------------------------------------------------------- |
-| `JWT_ISSUER`          | Emissor do JWT. Obrigatório em produção.                            |
-| `JWT_AUDIENCE`        | Audiência do JWT. Obrigatória em produção.                          |
-| `CORS_CREDENTIALS`    | Habilita credenciais em CORS quando `true`.                         |
-| `ENABLE_SWAGGER`      | Habilita Swagger fora de produção. Não pode ser `true` em produção. |
-| `SEED_ADMIN_EMAIL`    | E-mail do administrador criado pelo seed.                           |
-| `SEED_ADMIN_PASSWORD` | Senha do administrador criado pelo seed.                            |
-| `SEED_ADMIN_NAME`     | Nome do administrador criado pelo seed.                             |
+| Variável                          | Uso                                                                 |
+| --------------------------------- | ------------------------------------------------------------------- |
+| `JWT_ISSUER`                      | Emissor do JWT. Obrigatório em produção.                            |
+| `JWT_AUDIENCE`                    | Audiência do JWT. Obrigatória em produção.                          |
+| `CORS_CREDENTIALS`                | Habilita credenciais em CORS quando `true`.                         |
+| `ENABLE_SWAGGER`                  | Habilita Swagger fora de produção. Não pode ser `true` em produção. |
+| `QUEUE_PREFIX`                    | Prefixo das chaves BullMQ no Redis. Padrão: `oficina`.              |
+| `REDIS_HOST`                      | Host do Redis. Padrão local: `localhost`.                           |
+| `REDIS_PORT`                      | Porta do Redis. Padrão: `6379`.                                     |
+| `REDIS_DB`                        | Banco lógico do Redis. Padrão: `0`.                                 |
+| `REDIS_USERNAME`                  | Usuário do Redis, quando aplicável.                                 |
+| `REDIS_PASSWORD`                  | Senha do Redis, quando aplicável.                                   |
+| `REDIS_TLS`                       | Habilita TLS na conexão Redis quando `true`.                        |
+| `QUEUE_WHATSAPP_ATTEMPTS`         | Tentativas dos jobs de WhatsApp. Padrão: `5`.                       |
+| `QUEUE_WHATSAPP_BACKOFF_DELAY_MS` | Delay base do backoff exponencial. Padrão: `5000`.                  |
+| `SEED_ADMIN_EMAIL`                | E-mail do administrador criado pelo seed.                           |
+| `SEED_ADMIN_PASSWORD`             | Senha do administrador criado pelo seed.                            |
+| `SEED_ADMIN_NAME`                 | Nome do administrador criado pelo seed.                             |
 
 Em produção, a validação bloqueia `JWT_SECRET` fraco, `CORS_ORIGIN=*`, Swagger habilitado e ausência de `JWT_ISSUER`/`JWT_AUDIENCE`.
 
@@ -137,12 +150,18 @@ npm run prisma:seed:demo
 
 Esse seed é complementar ao seed de administrador e deve ser usado apenas em ambiente local/demo. Ele cria uma massa idempotente com prefixos `DEMO-` e e-mails `@oficina.local`, incluindo clientes, veículos, catálogo de serviços, estoque, orçamentos, ordens de serviço, histórico e lançamentos financeiros relacionados. Também cria usuários `demo.admin@oficina.local` e `demo.mecanico@oficina.local` com senha `Demo@123456`. Não execute esse script em produção.
 
+## Filas e mensageria
+
+O backend usa Redis + BullMQ para processar integrações externas de forma assíncrona. A fila inicial é `notifications.whatsapp`, usada para enviar notificações de mudança de status da ordem de serviço sem bloquear a resposta da API.
+
+Os contratos internos, payloads e regras de retry estão documentados em `QUEUE_DOCUMENTATION.md`.
+
 ## Execução local
 
 Fluxo recomendado para subir a API localmente:
 
 ```bash
-docker compose up -d postgres
+docker compose up -d postgres redis
 npm install
 npm run prisma:generate
 npm run prisma:migrate
@@ -187,13 +206,13 @@ npm run build
 Aplicação das migrations:
 
 ```bash
-npm run prisma:migrate:deploy
+npm run prisma:migrate:prod
 ```
 
 Inicialização:
 
 ```bash
-npm run start
+npm run start:prod
 ```
 
 Também é possível subir API e PostgreSQL com Docker Compose:
@@ -209,9 +228,10 @@ O serviço `api` do `docker-compose.yml` executa `prisma:generate`, `prisma:migr
 | Script                          | Descrição                                                          |
 | ------------------------------- | ------------------------------------------------------------------ |
 | `npm run build`                 | Compila o projeto NestJS para `dist/`.                             |
-| `npm run start`                 | Executa a aplicação compilada com `node dist/main.js`.             |
+| `npm run start`                 | Executa a aplicação compilada com `node dist/src/main.js`.         |
 | `npm run start:dev`             | Executa em modo desenvolvimento com watch.                         |
 | `npm run start:debug`           | Executa em modo debug com watch.                                   |
+| `npm run start:prod`            | Executa a aplicação compilada usando `.env.prod`.                  |
 | `npm run lint`                  | Roda ESLint em `src`, `test` e `prisma`.                           |
 | `npm run format`                | Formata arquivos TypeScript, JSON, Markdown e YAML com Prettier.   |
 | `npm run test`                  | Roda testes unitários com Jest.                                    |
@@ -219,8 +239,9 @@ O serviço `api` do `docker-compose.yml` executa `prisma:generate`, `prisma:migr
 | `npm run test:cov`              | Roda testes com cobertura.                                         |
 | `npm run test:e2e`              | Roda testes end-to-end com a configuração de `test/jest-e2e.json`. |
 | `npm run prisma:generate`       | Gera o Prisma Client.                                              |
-| `npm run prisma:migrate`        | Aplica/cria migrations em desenvolvimento.                         |
+| `npm run prisma:migrate`        | Aplica/cria migrations em desenvolvimento usando `.env`.           |
 | `npm run prisma:migrate:deploy` | Aplica migrations existentes em ambientes controlados/produção.    |
+| `npm run prisma:migrate:prod`   | Aplica migrations usando `.env.prod`.                              |
 | `npm run prisma:seed`           | Executa o seed de administrador.                                   |
 | `npm run prisma:seed:demo`      | Popula dados locais/demo para apresentações e screenshots.         |
 
@@ -352,7 +373,7 @@ Resposta esperada:
 
 Erro de validação de ambiente ao iniciar:
 
-- Verifique se todas as variáveis obrigatórias existem no `.env`.
+- Verifique se todas as variáveis obrigatórias existem no arquivo de ambiente ativo.
 - Em produção, confirme `JWT_SECRET` com pelo menos 32 caracteres, `JWT_ISSUER`, `JWT_AUDIENCE` e `ENABLE_SWAGGER=false`.
 - Verifique se `CORS_ORIGIN` não contém `*` nem origens vazias.
 
@@ -361,6 +382,12 @@ Erro de conexão com banco:
 - Confirme se o PostgreSQL está rodando.
 - Se usar Docker Compose, execute `docker compose up -d postgres`.
 - Confira usuário, senha, host, porta e database em `DATABASE_URL`.
+
+Erro de conexão com filas:
+
+- Confirme se o Redis está rodando.
+- Se usar Docker Compose, execute `docker compose up -d redis`.
+- Confira `REDIS_HOST`, `REDIS_PORT`, `REDIS_DB` e credenciais Redis no arquivo de ambiente ativo.
 
 Erro relacionado ao Prisma Client:
 
@@ -377,7 +404,7 @@ Swagger não abre:
 
 - O backend não deve ser executado em produção com Swagger habilitado.
 - O `docker-compose.yml` define `DATABASE_URL` interno apontando para o serviço `postgres`.
-- O arquivo `.env` local não deve ser versionado.
+- Os arquivos reais `.env*` não devem ser versionados.
 - Antes de abrir PRs ou publicar mudanças, rode ao menos `npm run lint` e `npm run test`.
 
 ## Melhorias futuras

@@ -79,10 +79,11 @@ export interface ServiceOrderResponseDto {
   updatedAt: Date;
 }
 
-export type ServiceOrderWhatsAppNotificationStatus = 'SENT' | 'SKIPPED' | 'FAILED';
+export type ServiceOrderWhatsAppNotificationStatus = 'SENT' | 'QUEUED' | 'SKIPPED' | 'FAILED';
 
 export interface ServiceOrderWhatsAppNotificationDto {
   status: ServiceOrderWhatsAppNotificationStatus;
+  jobId?: string;
   reason?: string;
   details?: string;
   providerStatusCode?: number;

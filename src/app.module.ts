@@ -8,6 +8,7 @@ import { BudgetConversionsModule } from 'src/budget-conversions/budget-conversio
 import { BudgetsModule } from 'src/budgets/budgets.module';
 import { ClientsModule } from 'src/clients/clients.module';
 import appConfig from 'src/config/app.config';
+import { getEnvFilePath } from 'src/config/env-file-path';
 import { validateEnv } from 'src/config/env.validation';
 import { HttpExceptionFilter } from 'src/common/filters/http-exception.filter';
 import { DashboardModule } from 'src/dashboard/dashboard.module';
@@ -15,6 +16,7 @@ import { FinancialModule } from 'src/financial/financial.module';
 import { InventoryModule } from 'src/inventory/inventory.module';
 import { NotificationsModule } from 'src/notifications/notifications.module';
 import { PrismaModule } from 'src/prisma/prisma.module';
+import { QueueModule } from 'src/queue/queue.module';
 import { ServiceCatalogModule } from 'src/service-catalog/service-catalog.module';
 import { ServiceOrdersModule } from 'src/service-orders/service-orders.module';
 import { UsersModule } from 'src/users/users.module';
@@ -27,7 +29,7 @@ import { HealthModule } from 'src/health/health.module';
       isGlobal: true,
       load: [appConfig],
       validate: validateEnv,
-      envFilePath: ['.env'],
+      envFilePath: getEnvFilePath(),
     }),
     LoggerModule.forRootAsync({
       inject: [ConfigService],
@@ -50,6 +52,7 @@ import { HealthModule } from 'src/health/health.module';
         },
       ],
     }),
+    QueueModule,
     PrismaModule,
     UsersModule,
     AuthModule,

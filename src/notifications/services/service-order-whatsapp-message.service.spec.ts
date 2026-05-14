@@ -1,6 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { ServiceOrderStatus } from '@prisma/client';
-import { ServiceOrderWhatsAppMessageService } from 'src/service-orders/services/service-order-whatsapp-message.service';
+import { ServiceOrderWhatsAppMessageService } from 'src/notifications/services/service-order-whatsapp-message.service';
 
 describe('ServiceOrderWhatsAppMessageService', () => {
   it('should build delivered template with header and client body parameter', () => {

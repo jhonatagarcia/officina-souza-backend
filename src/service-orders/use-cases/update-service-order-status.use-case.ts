@@ -6,19 +6,18 @@ import {
   Prisma,
   ServiceOrderStatus,
 } from '@prisma/client';
+import { Logger } from 'nestjs-pino';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { normalizeBrazilWhatsAppPhone } from 'src/notifications/whatsapp-phone.util';
-import { WhatsAppCloudApiService } from 'src/notifications/whatsapp-cloud-api.service';
 import { ServiceOrderWhatsAppNotificationDto } from 'src/service-orders/dto/service-order-response.dto';
+import { ServiceOrderStatusNotificationPublisher } from 'src/service-orders/notifications/service-order-status-notification.publisher';
 import { UpdateServiceOrderStatusDto } from 'src/service-orders/dto/update-service-order-status.dto';
-import { ServiceOrderWhatsAppMessageService } from 'src/service-orders/services/service-order-whatsapp-message.service';
 
 @Injectable()
 export class UpdateServiceOrderStatusUseCase {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly whatsAppMessageService: ServiceOrderWhatsAppMessageService,
-    private readonly whatsAppCloudApiService: WhatsAppCloudApiService,
+    private readonly notificationPublisher: ServiceOrderStatusNotificationPublisher,
+    private readonly logger: Logger,
   ) {}
 
   async execute(id: string, updateStatusDto: UpdateServiceOrderStatusDto) {
@@ -66,8 +65,9 @@ export class UpdateServiceOrderStatusUseCase {
       return updated;
     });
 
-    const whatsappNotification = await this.notifyClientWhenApplicable(
-      updatedServiceOrder.id,
+    const whatsappNotification = await this.publishNotificationJobWhenApplicable(
+      updatedServiceOrder,
+      serviceOrder.status,
       updateStatusDto.status,
       statusChanged,
     );
@@ -105,78 +105,51 @@ export class UpdateServiceOrderStatusUseCase {
     }
   }
 
-  private async notifyClientWhenApplicable(
-    serviceOrderId: string,
-    status: ServiceOrderStatus,
+  private async publishNotificationJobWhenApplicable(
+    serviceOrder: Prisma.ServiceOrderGetPayload<Record<string, never>>,
+    previousStatus: ServiceOrderStatus,
+    currentStatus: ServiceOrderStatus,
     statusChanged: boolean,
   ): Promise<ServiceOrderWhatsAppNotificationDto> {
     if (!statusChanged) {
       return { status: 'SKIPPED', reason: 'STATUS_UNCHANGED' };
     }
 
-    if (!this.whatsAppMessageService.shouldSendForStatus(status)) {
-      return { status: 'SKIPPED', reason: 'STATUS_NOT_NOTIFIABLE' };
+    try {
+      return await this.notificationPublisher.publishServiceOrderStatusChanged({
+        workshopId: this.extractWorkshopId(serviceOrder),
+        serviceOrderId: serviceOrder.id,
+        previousStatus,
+        currentStatus,
+      });
+    } catch (error) {
+      this.logger.error(
+        {
+          serviceOrderId: serviceOrder.id,
+          workshopId: this.extractWorkshopId(serviceOrder),
+          previousStatus,
+          currentStatus,
+          errorName: this.getSafeErrorName(error),
+        },
+        'Service order status changed but notification job could not be queued',
+      );
+
+      return { status: 'FAILED', reason: 'QUEUE_PUBLISH_FAILED' };
+    }
+  }
+
+  private extractWorkshopId(value: unknown): string | null {
+    if (!value || typeof value !== 'object') {
+      return null;
     }
 
-    const serviceOrder = await this.prisma.serviceOrder.findUnique({
-      where: { id: serviceOrderId },
-      include: { client: true },
-    });
+    const workshopId = (value as Record<string, unknown>).workshopId;
 
-    if (!serviceOrder) {
-      return { status: 'FAILED', reason: 'SERVICE_ORDER_NOT_FOUND' };
-    }
+    return typeof workshopId === 'string' && workshopId.trim() ? workshopId : null;
+  }
 
-    if (!serviceOrder.client) {
-      return { status: 'FAILED', reason: 'CLIENT_NOT_FOUND' };
-    }
-
-    const message = this.whatsAppMessageService.buildStatusMessage(
-      status,
-      serviceOrder.client.name,
-    );
-    const template = this.whatsAppMessageService.buildStatusTemplate(
-      status,
-      serviceOrder.client.name,
-    );
-
-    if (!message?.trim()) {
-      return { status: 'FAILED', reason: 'MESSAGE_NOT_AVAILABLE' };
-    }
-
-    if (!template) {
-      return { status: 'FAILED', reason: 'TEMPLATE_NOT_AVAILABLE' };
-    }
-
-    if (!serviceOrder.client.phone?.trim()) {
-      return { status: 'FAILED', reason: 'CLIENT_PHONE_MISSING' };
-    }
-
-    const phone = normalizeBrazilWhatsAppPhone(serviceOrder.client.phone);
-
-    if (!phone) {
-      return { status: 'FAILED', reason: 'CLIENT_PHONE_INVALID' };
-    }
-
-    const result = await this.whatsAppCloudApiService.sendTemplateMessage({
-      to: phone,
-      templateName: template.name,
-      languageCode: template.languageCode,
-      headerParameters: template.headerParameters,
-      bodyParameters: template.bodyParameters,
-    });
-
-    if (!result.success) {
-      return {
-        status: 'FAILED',
-        reason: result.errorCode ?? 'WHATSAPP_API_ERROR',
-        details: result.errorDetails ?? result.errorMessage,
-        providerStatusCode: result.providerStatusCode,
-        fbTraceId: result.fbTraceId,
-      };
-    }
-
-    return { status: 'SENT' };
+  private getSafeErrorName(error: unknown): string {
+    return error instanceof Error ? error.name : 'UnknownError';
   }
 
   private async registerHistory(serviceOrderId: string, tx: Prisma.TransactionClient) {
