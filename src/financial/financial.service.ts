@@ -2,6 +2,8 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { FinancialEntryType, FinancialStatus, Prisma } from '@prisma/client';
 import { ClientsService } from 'src/clients/clients.service';
 import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
+import { requireWorkshopId } from 'src/common/tenant/tenant-context';
+import type { RequestUser } from 'src/common/types/request-user.type';
 import { getCurrentMonthRange } from 'src/common/utils/date-period.util';
 import { buildSafeOrderBy } from 'src/common/utils/order-by.util';
 import { buildPaginationMeta, PaginatedResponse } from 'src/common/utils/pagination.util';
@@ -28,9 +30,12 @@ export class FinancialService {
   ) {}
 
   async create(
+    user: RequestUser,
     createFinancialEntryDto: CreateFinancialEntryDto,
   ): Promise<FinancialEntryResponseDto> {
+    const workshopId = requireWorkshopId(user);
     await this.validateReferences(
+      workshopId,
       createFinancialEntryDto.clientId,
       createFinancialEntryDto.serviceOrderId,
     );
@@ -40,6 +45,7 @@ export class FinancialService {
 
     const entry = await this.prisma.financialEntry.create({
       data: {
+        workshopId,
         type: createFinancialEntryDto.type,
         description: createFinancialEntryDto.description,
         category: createFinancialEntryDto.category,
@@ -58,11 +64,14 @@ export class FinancialService {
   }
 
   async findAll(
+    user: RequestUser,
     pagination: PaginationQueryDto,
   ): Promise<PaginatedResponse<FinancialEntryResponseDto>> {
-    await this.syncOverdueStatuses();
+    const workshopId = requireWorkshopId(user);
+    await this.syncOverdueStatuses(workshopId);
 
     const where: Prisma.FinancialEntryWhereInput = {
+      workshopId,
       ...(pagination.search
         ? {
             OR: [
@@ -100,11 +109,12 @@ export class FinancialService {
     };
   }
 
-  async findOne(id: string): Promise<FinancialEntryResponseDto> {
-    await this.syncOverdueStatuses();
+  async findOne(user: RequestUser, id: string): Promise<FinancialEntryResponseDto> {
+    const workshopId = requireWorkshopId(user);
+    await this.syncOverdueStatuses(workshopId);
 
     const entry = await this.prisma.financialEntry.findUnique({
-      where: { id },
+      where: { id_workshopId: { id, workshopId } },
       include: { client: true, serviceOrder: true },
     });
 
@@ -115,19 +125,22 @@ export class FinancialService {
     return toFinancialEntryResponseDto(entry);
   }
 
-  async getSummary() {
+  async getSummary(user: RequestUser) {
+    const workshopId = requireWorkshopId(user);
     const currentMonth = getCurrentMonthRange();
 
     const [receivablesSummary, paidServiceOrders, unbilledPartsSummary] = await Promise.all([
       this.prisma.financialEntry.aggregate({
         _sum: { amount: true },
         where: {
+          workshopId,
           type: FinancialEntryType.RECEIVABLE,
           dueDate: { gte: currentMonth.start, lt: currentMonth.end },
         },
       }),
       this.prisma.serviceOrder.findMany({
         where: {
+          workshopId,
           financialEntries: {
             some: {
               type: FinancialEntryType.RECEIVABLE,
@@ -172,6 +185,7 @@ export class FinancialService {
         where: {
           updatedAt: { gte: currentMonth.start, lt: currentMonth.end },
           serviceOrder: {
+            workshopId,
             financialEntries: {
               none: {
                 type: FinancialEntryType.RECEIVABLE,
@@ -194,13 +208,15 @@ export class FinancialService {
   }
 
   async update(
+    user: RequestUser,
     id: string,
     updateFinancialEntryDto: UpdateFinancialEntryDto,
   ): Promise<FinancialEntryResponseDto> {
-    await this.syncOverdueStatuses();
+    const workshopId = requireWorkshopId(user);
+    await this.syncOverdueStatuses(workshopId);
 
     const entry = await this.prisma.financialEntry.findUnique({
-      where: { id },
+      where: { id_workshopId: { id, workshopId } },
       include: { client: true, serviceOrder: true },
     });
 
@@ -213,12 +229,13 @@ export class FinancialService {
     }
 
     await this.validateReferences(
+      workshopId,
       updateFinancialEntryDto.clientId ?? entry.clientId ?? undefined,
       updateFinancialEntryDto.serviceOrderId ?? entry.serviceOrderId ?? undefined,
     );
 
     const updated = await this.prisma.financialEntry.update({
-      where: { id },
+      where: { id_workshopId: { id, workshopId } },
       data: {
         type: updateFinancialEntryDto.type,
         description: updateFinancialEntryDto.description,
@@ -242,13 +259,15 @@ export class FinancialService {
   }
 
   async pay(
+    user: RequestUser,
     id: string,
     payFinancialEntryDto: PayFinancialEntryDto,
   ): Promise<FinancialEntryResponseDto> {
-    await this.syncOverdueStatuses();
+    const workshopId = requireWorkshopId(user);
+    await this.syncOverdueStatuses(workshopId);
 
     const entry = await this.prisma.financialEntry.findUnique({
-      where: { id },
+      where: { id_workshopId: { id, workshopId } },
       include: { client: true, serviceOrder: true },
     });
 
@@ -263,7 +282,7 @@ export class FinancialService {
     const paidAt = new Date(payFinancialEntryDto.paidAt);
 
     const updated = await this.prisma.financialEntry.update({
-      where: { id },
+      where: { id_workshopId: { id, workshopId } },
       data: {
         status: FinancialStatus.PAGO,
         paymentMethod: payFinancialEntryDto.paymentMethod,
@@ -275,11 +294,11 @@ export class FinancialService {
     return toFinancialEntryResponseDto(updated);
   }
 
-  private async validateReferences(clientId?: string, serviceOrderId?: string) {
+  private async validateReferences(workshopId: string, clientId?: string, serviceOrderId?: string) {
     const [client, serviceOrder] = await Promise.all([
-      clientId ? this.clientsService.ensureExists(clientId) : Promise.resolve(null),
+      clientId ? this.clientsService.ensureExists(workshopId, clientId) : Promise.resolve(null),
       serviceOrderId
-        ? this.serviceOrdersService.ensureExists(serviceOrderId)
+        ? this.serviceOrdersService.ensureExists(workshopId, serviceOrderId)
         : Promise.resolve(null),
     ]);
 
@@ -300,10 +319,11 @@ export class FinancialService {
     return dueDate < new Date() ? FinancialStatus.VENCIDO : FinancialStatus.PENDENTE;
   }
 
-  private async syncOverdueStatuses() {
+  private async syncOverdueStatuses(workshopId: string) {
     await this.prisma.financialEntry.updateMany({
       where: {
         status: FinancialStatus.PENDENTE,
+        workshopId,
         dueDate: { lt: new Date() },
       },
       data: {

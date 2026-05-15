@@ -10,15 +10,15 @@ export class ApproveBudgetUseCase {
     private readonly budgetReader: BudgetReaderService,
   ) {}
 
-  async execute(id: string) {
-    const budget = await this.budgetReader.ensureExists(id);
+  async execute(workshopId: string, id: string) {
+    const budget = await this.budgetReader.ensureExists(workshopId, id);
 
     if (budget.status !== BudgetStatus.PENDENTE) {
       throw new BadRequestException('Apenas orcamentos pendentes podem ser aprovados');
     }
 
     return this.prisma.budget.update({
-      where: { id },
+      where: { id_workshopId: { id, workshopId } },
       data: {
         status: BudgetStatus.APROVADO,
         approvedAt: new Date(),

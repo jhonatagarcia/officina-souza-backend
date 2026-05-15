@@ -8,6 +8,13 @@ import { RolesGuard } from 'src/common/guards/roles.guard';
 import { ServiceCatalogController } from 'src/service-catalog/service-catalog.controller';
 import { ServiceCatalogService } from 'src/service-catalog/service-catalog.service';
 
+const tenantUser = {
+  sub: 'user-1',
+  email: 'admin@local.com',
+  role: 'ADMIN' as const,
+  workshopId: 'workshop-1',
+};
+
 describe('ServiceCatalogController', () => {
   let controller: ServiceCatalogController;
   let rolesGuard: RolesGuard;
@@ -55,7 +62,7 @@ describe('ServiceCatalogController', () => {
   it('should delegate create to the service', async () => {
     serviceCatalogServiceMock.create.mockResolvedValue({ id: 'svc-1' });
 
-    const result = await controller.create({
+    const result = await controller.create(tenantUser, {
       code: 'SRV-001',
       name: 'Troca de oleo',
       category: 'manutencao',
@@ -103,11 +110,11 @@ describe('ServiceCatalogController', () => {
     serviceCatalogServiceMock.activate.mockResolvedValue({ id: 'svc-1', active: true });
     serviceCatalogServiceMock.deactivate.mockResolvedValue({ id: 'svc-1', active: false });
 
-    const activated = await controller.activate('svc-1');
-    const deactivated = await controller.deactivate('svc-1');
+    const activated = await controller.activate(tenantUser, 'svc-1');
+    const deactivated = await controller.deactivate(tenantUser, 'svc-1');
 
-    expect(serviceCatalogServiceMock.activate).toHaveBeenCalledWith('svc-1');
-    expect(serviceCatalogServiceMock.deactivate).toHaveBeenCalledWith('svc-1');
+    expect(serviceCatalogServiceMock.activate).toHaveBeenCalledWith(tenantUser, 'svc-1');
+    expect(serviceCatalogServiceMock.deactivate).toHaveBeenCalledWith(tenantUser, 'svc-1');
     expect(activated.active).toBe(true);
     expect(deactivated.active).toBe(false);
   });

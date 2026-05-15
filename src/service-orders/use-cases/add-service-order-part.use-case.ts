@@ -10,9 +10,9 @@ export class AddServiceOrderPartUseCase {
     private readonly inventoryService: InventoryService,
   ) {}
 
-  async execute(serviceOrderId: string, addPartDto: AddServiceOrderPartDto) {
+  async execute(workshopId: string, serviceOrderId: string, addPartDto: AddServiceOrderPartDto) {
     const serviceOrder = await this.prisma.serviceOrder.findUnique({
-      where: { id: serviceOrderId },
+      where: { id_workshopId: { id: serviceOrderId, workshopId } },
     });
 
     if (!serviceOrder) {
@@ -24,6 +24,7 @@ export class AddServiceOrderPartUseCase {
         where: {
           serviceOrderId,
           inventoryItemId: addPartDto.inventoryItemId,
+          serviceOrder: { workshopId },
         },
       });
 
@@ -31,6 +32,7 @@ export class AddServiceOrderPartUseCase {
         addPartDto.inventoryItemId,
         addPartDto.quantity,
         tx,
+        workshopId,
         {
           serviceOrderId,
           serviceOrderPartId: existingPart?.id,

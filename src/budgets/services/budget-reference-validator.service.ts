@@ -9,10 +9,10 @@ export class BudgetReferenceValidatorService {
     private readonly vehiclesService: VehiclesService,
   ) {}
 
-  async validate(clientId: string, vehicleId: string) {
+  async validate(workshopId: string, clientId: string, vehicleId: string) {
     const [client, vehicle] = await Promise.all([
-      this.clientsService.ensureExists(clientId),
-      this.vehiclesService.ensureExists(vehicleId),
+      this.clientsService.ensureExists(workshopId, clientId),
+      this.vehiclesService.ensureExists(workshopId, vehicleId),
     ]);
 
     if (vehicle.clientId !== client.id) {

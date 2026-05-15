@@ -31,6 +31,7 @@ describe('JwtStrategy', () => {
 
   const buildUser = (overrides: { id: string; email: string; role: Role; isActive: boolean }) => ({
     name: 'User',
+    workshopId: 'workshop-1',
     passwordHash: 'hash',
     lastLoginAt: null,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -82,11 +83,13 @@ describe('JwtStrategy', () => {
         sub: 'user-1',
         email: 'mechanic@local.com',
         role: Role.ADMIN,
+        workshopId: 'workshop-1',
       }),
     ).resolves.toEqual({
       sub: 'user-1',
       email: 'mechanic@local.com',
       role: Role.MECANICO,
+      workshopId: 'workshop-1',
     });
   });
 });

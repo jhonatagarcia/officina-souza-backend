@@ -17,16 +17,19 @@ export interface BudgetItemReferences {
 export class BudgetItemReferenceService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async loadAndValidate(items: BudgetItemInput[]): Promise<BudgetItemReferences> {
+  async loadAndValidate(
+    workshopId: string,
+    items: BudgetItemInput[],
+  ): Promise<BudgetItemReferences> {
     const [serviceCatalogItems, inventoryItems] = await Promise.all([
-      this.loadServiceCatalogItems(items),
-      this.loadInventoryItems(items),
+      this.loadServiceCatalogItems(workshopId, items),
+      this.loadInventoryItems(workshopId, items),
     ]);
 
     return { serviceCatalogItems, inventoryItems };
   }
 
-  private async loadServiceCatalogItems(items: BudgetItemInput[]) {
+  private async loadServiceCatalogItems(workshopId: string, items: BudgetItemInput[]) {
     const serviceCatalogItemIds = this.uniqueDefinedValues(
       items.map((item) => item.serviceCatalogItemId),
     );
@@ -36,7 +39,7 @@ export class BudgetItemReferenceService {
     }
 
     const serviceCatalogItems = await this.prisma.serviceCatalogItem.findMany({
-      where: { id: { in: serviceCatalogItemIds } },
+      where: { id: { in: serviceCatalogItemIds }, workshopId },
       select: { id: true, code: true, active: true },
     });
 
@@ -60,7 +63,7 @@ export class BudgetItemReferenceService {
     return byId;
   }
 
-  private async loadInventoryItems(items: BudgetItemInput[]) {
+  private async loadInventoryItems(workshopId: string, items: BudgetItemInput[]) {
     const inventoryItemIds = this.uniqueDefinedValues(items.map((item) => item.inventoryItemId));
 
     if (!inventoryItemIds.length) {
@@ -68,7 +71,7 @@ export class BudgetItemReferenceService {
     }
 
     const inventoryItems = await this.prisma.inventoryItem.findMany({
-      where: { id: { in: inventoryItemIds } },
+      where: { id: { in: inventoryItemIds }, workshopId },
       select: { id: true },
     });
 

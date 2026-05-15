@@ -5,6 +5,9 @@ import { PassportModule } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
 import { AuthController } from 'src/auth/auth.controller';
 import { AuthService } from 'src/auth/auth.service';
+import { CaptchaService } from 'src/auth/services/captcha.service';
+import { PasswordResetEmailService } from 'src/auth/services/password-reset-email.service';
+import { PasswordResetTokenService } from 'src/auth/services/password-reset-token.service';
 import { JwtStrategy } from 'src/auth/strategies/jwt.strategy';
 import { UsersModule } from 'src/users/users.module';
 
@@ -25,7 +28,13 @@ import { UsersModule } from 'src/users/users.module';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    CaptchaService,
+    PasswordResetTokenService,
+    PasswordResetEmailService,
+  ],
   exports: [AuthService],
 })
 export class AuthModule {}

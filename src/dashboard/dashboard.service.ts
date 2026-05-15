@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { FinancialEntryType, FinancialStatus, Prisma, ServiceOrderStatus } from '@prisma/client';
+import { requireWorkshopId } from 'src/common/tenant/tenant-context';
+import type { RequestUser } from 'src/common/types/request-user.type';
 import { getCurrentMonthRange } from 'src/common/utils/date-period.util';
 import { StockOutValueService } from 'src/financial/services/stock-out-value.service';
 import { isLowStock } from 'src/inventory/utils/inventory-stock-status.util';
@@ -12,7 +14,8 @@ export class DashboardService {
     private readonly stockOutValueService: StockOutValueService,
   ) {}
 
-  async getSummary() {
+  async getSummary(user: RequestUser) {
+    const workshopId = requireWorkshopId(user);
     const currentMonth = getCurrentMonthRange();
 
     const [
@@ -25,22 +28,29 @@ export class DashboardService {
       paidServiceOrders,
       unbilledPartsSummary,
     ] = await Promise.all([
-      this.prisma.serviceOrder.count({ where: { status: ServiceOrderStatus.ABERTA } }),
-      this.prisma.serviceOrder.count({ where: { status: ServiceOrderStatus.EM_ANDAMENTO } }),
-      this.prisma.serviceOrder.count({ where: { status: ServiceOrderStatus.FINALIZADA } }),
-      this.prisma.budget.count({ where: { status: 'PENDENTE' } }),
+      this.prisma.serviceOrder.count({ where: { workshopId, status: ServiceOrderStatus.ABERTA } }),
+      this.prisma.serviceOrder.count({
+        where: { workshopId, status: ServiceOrderStatus.EM_ANDAMENTO },
+      }),
+      this.prisma.serviceOrder.count({
+        where: { workshopId, status: ServiceOrderStatus.FINALIZADA },
+      }),
+      this.prisma.budget.count({ where: { workshopId, status: 'PENDENTE' } }),
       this.prisma.inventoryItem.findMany({
+        where: { workshopId },
         select: { id: true, name: true, quantity: true, minimumQuantity: true, internalCode: true },
       }),
       this.prisma.financialEntry.aggregate({
         _sum: { amount: true },
         where: {
+          workshopId,
           type: FinancialEntryType.RECEIVABLE,
           dueDate: { gte: currentMonth.start, lt: currentMonth.end },
         },
       }),
       this.prisma.serviceOrder.findMany({
         where: {
+          workshopId,
           financialEntries: {
             some: {
               type: FinancialEntryType.RECEIVABLE,
@@ -85,6 +95,7 @@ export class DashboardService {
         where: {
           updatedAt: { gte: currentMonth.start, lt: currentMonth.end },
           serviceOrder: {
+            workshopId,
             financialEntries: {
               none: {
                 type: FinancialEntryType.RECEIVABLE,

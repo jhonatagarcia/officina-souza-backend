@@ -11,9 +11,11 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { Role } from 'src/common/enums/role.enum';
 import { RolesGuard } from 'src/common/guards/roles.guard';
+import type { RequestUser } from 'src/common/types/request-user.type';
 import { CreateUserDto } from 'src/users/dto/create-user.dto';
 import { ListUsersQueryDto } from 'src/users/dto/list-users-query.dto';
 import { UpdateUserDto } from 'src/users/dto/update-user.dto';
@@ -29,28 +31,32 @@ export class UsersController {
   @Post()
   @Roles(Role.ADMIN)
   @ApiOperation({ summary: 'Cria usuário interno' })
-  create(@Body() createUserDto: CreateUserDto) {
-    return this.usersService.create(createUserDto);
+  create(@CurrentUser() user: RequestUser, @Body() createUserDto: CreateUserDto) {
+    return this.usersService.create(user, createUserDto);
   }
 
   @Get()
   @Roles(Role.ADMIN)
   @ApiOperation({ summary: 'Lista usuários internos' })
-  findAll(@Query() query: ListUsersQueryDto) {
-    return this.usersService.findAll(query);
+  findAll(@CurrentUser() user: RequestUser, @Query() query: ListUsersQueryDto) {
+    return this.usersService.findAll(user, query);
   }
 
   @Get(':id')
   @Roles(Role.ADMIN)
   @ApiOperation({ summary: 'Obtém um usuário interno' })
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.usersService.findById(id);
+  findOne(@CurrentUser() user: RequestUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.usersService.findByIdForUser(user, id);
   }
 
   @Patch(':id')
   @Roles(Role.ADMIN)
   @ApiOperation({ summary: 'Atualiza usuário interno' })
-  update(@Param('id', ParseUUIDPipe) id: string, @Body() updateUserDto: UpdateUserDto) {
-    return this.usersService.update(id, updateUserDto);
+  update(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updateUserDto: UpdateUserDto,
+  ) {
+    return this.usersService.update(user, id, updateUserDto);
   }
 }

@@ -16,6 +16,17 @@ export default () => ({
     jwtAudience: process.env.JWT_AUDIENCE ?? process.env.API_PREFIX,
     bcryptSaltRounds: Number(process.env.BCRYPT_SALT_ROUNDS),
   },
+  passwordReset: {
+    tokenTtlMinutes: Number(process.env.PASSWORD_RESET_TOKEN_TTL_MINUTES ?? 30),
+    appUrl: process.env.PASSWORD_RESET_APP_URL,
+  },
+  captcha: {
+    enabled: process.env.CAPTCHA_ENABLED === 'true',
+    provider: process.env.CAPTCHA_PROVIDER,
+    secret: process.env.CAPTCHA_SECRET,
+    verifyUrl: process.env.CAPTCHA_VERIFY_URL,
+    expectedAction: process.env.CAPTCHA_EXPECTED_ACTION ?? 'none',
+  },
   cors: {
     origin: process.env.CORS_ORIGIN?.split(',').map((origin) => origin.trim()),
     credentials: process.env.CORS_CREDENTIALS === 'true',

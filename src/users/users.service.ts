@@ -9,6 +9,8 @@ import { Prisma, User } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 import { Role } from 'src/common/enums/role.enum';
+import { requireWorkshopId } from 'src/common/tenant/tenant-context';
+import type { RequestUser } from 'src/common/types/request-user.type';
 import { buildSafeOrderBy } from 'src/common/utils/order-by.util';
 import { buildPaginationMeta, PaginatedResponse } from 'src/common/utils/pagination.util';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -35,7 +37,11 @@ export class UsersService {
     private readonly configService: ConfigService,
   ) {}
 
-  async create(createUserDto: CreateUserDto): Promise<Omit<User, 'passwordHash'>> {
+  async create(
+    currentUser: RequestUser,
+    createUserDto: CreateUserDto,
+  ): Promise<Omit<User, 'passwordHash'>> {
+    const workshopId = requireWorkshopId(currentUser);
     const existing = await this.prisma.user.findUnique({
       where: { email: createUserDto.email.toLowerCase() },
     });
@@ -49,21 +55,27 @@ export class UsersService {
       this.configService.getOrThrow<number>('auth.bcryptSaltRounds'),
     );
 
-    const user = await this.prisma.user.create({
+    const createdUser = await this.prisma.user.create({
       data: {
         name: createUserDto.name,
         email: createUserDto.email.toLowerCase(),
         passwordHash,
+        workshopId,
         role: createUserDto.role,
         isActive: createUserDto.isActive ?? true,
       },
     });
 
-    return this.sanitizeUser(user);
+    return this.sanitizeUser(createdUser);
   }
 
-  async findAll(query: ListUsersQueryDto): Promise<PaginatedResponse<UserResponseDto>> {
+  async findAll(
+    currentUser: RequestUser,
+    query: ListUsersQueryDto,
+  ): Promise<PaginatedResponse<UserResponseDto>> {
+    const workshopId = requireWorkshopId(currentUser);
     const where: Prisma.UserWhereInput = {
+      workshopId,
       ...(query.role ? { role: query.role } : {}),
       ...(query.active !== undefined ? { isActive: query.active } : {}),
       ...(query.search
@@ -97,8 +109,11 @@ export class UsersService {
     };
   }
 
-  async findAllMechanics(query: ListUsersQueryDto): Promise<PaginatedResponse<UserResponseDto>> {
-    return this.findAll({ ...query, role: Role.MECANICO });
+  async findAllMechanics(
+    user: RequestUser,
+    query: ListUsersQueryDto,
+  ): Promise<PaginatedResponse<UserResponseDto>> {
+    return this.findAll(user, { ...query, role: Role.MECANICO });
   }
 
   async findByEmail(email: string): Promise<User | null> {
@@ -107,9 +122,9 @@ export class UsersService {
     });
   }
 
-  async findById(id: string): Promise<Omit<User, 'passwordHash'>> {
-    const user = await this.prisma.user.findUnique({
-      where: { id },
+  async findById(workshopId: string, id: string): Promise<Omit<User, 'passwordHash'>> {
+    const user = await this.prisma.user.findFirst({
+      where: { id, workshopId },
     });
 
     if (!user) {
@@ -119,8 +134,15 @@ export class UsersService {
     return this.sanitizeUser(user);
   }
 
-  async findMechanicById(id: string): Promise<Omit<User, 'passwordHash'>> {
-    const mechanic = await this.findById(id);
+  async findByIdForUser(user: RequestUser, id: string): Promise<Omit<User, 'passwordHash'>> {
+    return this.findById(requireWorkshopId(user), id);
+  }
+
+  async findMechanicByIdForUser(
+    user: RequestUser,
+    id: string,
+  ): Promise<Omit<User, 'passwordHash'>> {
+    const mechanic = await this.findByIdForUser(user, id);
 
     if (mechanic.role !== Role.MECANICO) {
       throw new NotFoundException('Mecanico nao encontrado');
@@ -129,13 +151,19 @@ export class UsersService {
     return mechanic;
   }
 
-  async update(id: string, updateUserDto: UpdateUserDto): Promise<Omit<User, 'passwordHash'>> {
-    await this.findById(id);
+  async update(
+    user: RequestUser,
+    id: string,
+    updateUserDto: UpdateUserDto,
+  ): Promise<Omit<User, 'passwordHash'>> {
+    const workshopId = requireWorkshopId(user);
+    await this.findById(workshopId, id);
 
     if (updateUserDto.email) {
       const existing = await this.prisma.user.findFirst({
         where: {
           email: updateUserDto.email.toLowerCase(),
+          workshopId,
           NOT: { id },
         },
       });
@@ -152,7 +180,7 @@ export class UsersService {
         )
       : undefined;
 
-    const user = await this.prisma.user.update({
+    const updatedUser = await this.prisma.user.update({
       where: { id },
       data: {
         ...(updateUserDto.name !== undefined ? { name: updateUserDto.name } : {}),
@@ -163,14 +191,17 @@ export class UsersService {
       },
     });
 
-    return this.sanitizeUser(user);
+    return this.sanitizeUser(updatedUser);
   }
 
-  async createMechanic(createMechanicDto: CreateMechanicDto): Promise<Omit<User, 'passwordHash'>> {
+  async createMechanic(
+    user: RequestUser,
+    createMechanicDto: CreateMechanicDto,
+  ): Promise<Omit<User, 'passwordHash'>> {
     const email = await this.generateMechanicEmail(createMechanicDto.name);
     const password = this.generateInternalPassword();
 
-    return this.create({
+    return this.create(user, {
       name: createMechanicDto.name,
       email,
       password,
@@ -180,12 +211,13 @@ export class UsersService {
   }
 
   async updateMechanic(
+    user: RequestUser,
     id: string,
     updateMechanicDto: UpdateMechanicDto,
   ): Promise<Omit<User, 'passwordHash'>> {
-    const mechanic = await this.findMechanicById(id);
+    const mechanic = await this.findMechanicByIdForUser(user, id);
 
-    return this.update(mechanic.id, {
+    return this.update(user, mechanic.id, {
       ...(updateMechanicDto.name !== undefined ? { name: updateMechanicDto.name } : {}),
       ...(updateMechanicDto.isActive !== undefined ? { isActive: updateMechanicDto.isActive } : {}),
     });

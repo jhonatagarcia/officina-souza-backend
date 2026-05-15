@@ -4,6 +4,13 @@ import { DashboardService } from 'src/dashboard/dashboard.service';
 import { StockOutValueService } from 'src/financial/services/stock-out-value.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 
+const tenantUser = {
+  sub: 'user-1',
+  email: 'admin@local.com',
+  role: 'ADMIN' as const,
+  workshopId: 'workshop-1',
+};
+
 describe('DashboardService', () => {
   let service: DashboardService;
 
@@ -108,7 +115,7 @@ describe('DashboardService', () => {
       },
     ]);
 
-    const result = await service.getSummary();
+    const result = await service.getSummary(tenantUser);
 
     expect(result).toEqual({
       serviceOrders: {
@@ -146,6 +153,7 @@ describe('DashboardService', () => {
 
     expect(prismaMock.serviceOrder.findMany).toHaveBeenCalledWith({
       where: {
+        workshopId: 'workshop-1',
         financialEntries: {
           some: {
             type: 'RECEIVABLE',
@@ -193,6 +201,7 @@ describe('DashboardService', () => {
           lt: expect.any(Date) as Date,
         },
         serviceOrder: {
+          workshopId: 'workshop-1',
           financialEntries: {
             none: {
               type: 'RECEIVABLE',
@@ -232,7 +241,7 @@ describe('DashboardService', () => {
       },
     ]);
 
-    const result = await service.getSummary();
+    const result = await service.getSummary(tenantUser);
 
     expect(result.financial.stockOutValue).toEqual(new Prisma.Decimal(35));
   });

@@ -7,6 +7,8 @@ import {
 import { Prisma } from '@prisma/client';
 import { ServiceBillingType } from 'src/common/enums/service-billing-type.enum';
 import { ServiceMaterialSource } from 'src/common/enums/service-material-source.enum';
+import { requireWorkshopId } from 'src/common/tenant/tenant-context';
+import type { RequestUser } from 'src/common/types/request-user.type';
 import { buildSafeOrderBy } from 'src/common/utils/order-by.util';
 import { buildPaginationMeta, PaginatedResponse } from 'src/common/utils/pagination.util';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -37,13 +39,19 @@ export class ServiceCatalogService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(
+    user: RequestUser,
     createServiceCatalogItemDto: CreateServiceCatalogItemDto,
   ): Promise<ServiceCatalogItemResponseDto> {
+    const workshopId = requireWorkshopId(user);
     const normalizedData = this.normalizeInput(createServiceCatalogItemDto);
-    const code = normalizedData.code ?? (await this.generateInternalCode());
+    const code = normalizedData.code ?? (await this.generateInternalCode(workshopId));
 
-    await this.ensureUniqueCode(code);
-    await this.ensureUniqueNameWithinCategory(normalizedData.name, normalizedData.category);
+    await this.ensureUniqueCode(workshopId, code);
+    await this.ensureUniqueNameWithinCategory(
+      workshopId,
+      normalizedData.name,
+      normalizedData.category,
+    );
 
     const priceSnapshot = this.buildRuleSnapshot({
       laborPrice: normalizedData.laborPrice,
@@ -55,6 +63,7 @@ export class ServiceCatalogService {
 
     const item = await this.prisma.serviceCatalogItem.create({
       data: {
+        workshopId,
         ...normalizedData,
         code,
         suggestedTotalPrice: this.calculateSuggestedTotalPrice(
@@ -68,9 +77,12 @@ export class ServiceCatalogService {
   }
 
   async findAll(
+    user: RequestUser,
     query: ListServiceCatalogItemsQueryDto,
   ): Promise<PaginatedResponse<ServiceCatalogItemResponseDto>> {
+    const workshopId = requireWorkshopId(user);
     const where: Prisma.ServiceCatalogItemWhereInput = {
+      workshopId,
       ...(query.active !== undefined ? { active: query.active } : {}),
       ...(query.category
         ? {
@@ -111,9 +123,10 @@ export class ServiceCatalogService {
     };
   }
 
-  async findOne(id: string): Promise<ServiceCatalogItemResponseDto> {
+  async findOne(user: RequestUser, id: string): Promise<ServiceCatalogItemResponseDto> {
+    const workshopId = requireWorkshopId(user);
     const item = await this.prisma.serviceCatalogItem.findUnique({
-      where: { id },
+      where: { id_workshopId: { id, workshopId } },
     });
 
     if (!item) {
@@ -124,14 +137,16 @@ export class ServiceCatalogService {
   }
 
   async update(
+    user: RequestUser,
     id: string,
     updateServiceCatalogItemDto: UpdateServiceCatalogItemDto,
   ): Promise<ServiceCatalogItemResponseDto> {
-    const existing = await this.ensureExists(id);
+    const workshopId = requireWorkshopId(user);
+    const existing = await this.ensureExists(workshopId, id);
     const normalizedData = this.normalizeInput(updateServiceCatalogItemDto);
 
     if (normalizedData.code) {
-      await this.ensureUniqueCode(normalizedData.code, id);
+      await this.ensureUniqueCode(workshopId, normalizedData.code, id);
     }
 
     const mergedSnapshot = this.buildRuleSnapshot({
@@ -148,13 +163,13 @@ export class ServiceCatalogService {
       nextName.localeCompare(existing.name, undefined, { sensitivity: 'accent' }) !== 0 ||
       nextCategory.localeCompare(existing.category, undefined, { sensitivity: 'accent' }) !== 0
     ) {
-      await this.ensureUniqueNameWithinCategory(nextName, nextCategory, id);
+      await this.ensureUniqueNameWithinCategory(workshopId, nextName, nextCategory, id);
     }
 
     this.validateBusinessRules(mergedSnapshot);
 
     const item = await this.prisma.serviceCatalogItem.update({
-      where: { id },
+      where: { id_workshopId: { id, workshopId } },
       data: {
         ...normalizedData,
         suggestedTotalPrice: this.calculateSuggestedTotalPrice(
@@ -167,31 +182,33 @@ export class ServiceCatalogService {
     return toServiceCatalogItemResponseDto(item);
   }
 
-  async activate(id: string): Promise<ServiceCatalogItemResponseDto> {
-    await this.ensureExists(id);
+  async activate(user: RequestUser, id: string): Promise<ServiceCatalogItemResponseDto> {
+    const workshopId = requireWorkshopId(user);
+    await this.ensureExists(workshopId, id);
 
     const item = await this.prisma.serviceCatalogItem.update({
-      where: { id },
+      where: { id_workshopId: { id, workshopId } },
       data: { active: true },
     });
 
     return toServiceCatalogItemResponseDto(item);
   }
 
-  async deactivate(id: string): Promise<ServiceCatalogItemResponseDto> {
-    await this.ensureExists(id);
+  async deactivate(user: RequestUser, id: string): Promise<ServiceCatalogItemResponseDto> {
+    const workshopId = requireWorkshopId(user);
+    await this.ensureExists(workshopId, id);
 
     const item = await this.prisma.serviceCatalogItem.update({
-      where: { id },
+      where: { id_workshopId: { id, workshopId } },
       data: { active: false },
     });
 
     return toServiceCatalogItemResponseDto(item);
   }
 
-  async ensureExists(id: string) {
+  async ensureExists(workshopId: string, id: string) {
     const item = await this.prisma.serviceCatalogItem.findUnique({
-      where: { id },
+      where: { id_workshopId: { id, workshopId } },
     });
 
     if (!item) {
@@ -274,9 +291,10 @@ export class ServiceCatalogService {
     return laborPrice.plus(productPrice);
   }
 
-  private async ensureUniqueCode(code: string, excludeId?: string) {
+  private async ensureUniqueCode(workshopId: string, code: string, excludeId?: string) {
     const existing = await this.prisma.serviceCatalogItem.findFirst({
       where: {
+        workshopId,
         code,
         ...(excludeId ? { NOT: { id: excludeId } } : {}),
       },
@@ -287,9 +305,10 @@ export class ServiceCatalogService {
     }
   }
 
-  private async generateInternalCode() {
+  private async generateInternalCode(workshopId: string) {
     const lastGeneratedItem = await this.prisma.serviceCatalogItem.findFirst({
       where: {
+        workshopId,
         code: {
           startsWith: 'SRV-',
         },
@@ -307,9 +326,15 @@ export class ServiceCatalogService {
     return `SRV-${nextSequence.toString().padStart(6, '0')}`;
   }
 
-  private async ensureUniqueNameWithinCategory(name: string, category: string, excludeId?: string) {
+  private async ensureUniqueNameWithinCategory(
+    workshopId: string,
+    name: string,
+    category: string,
+    excludeId?: string,
+  ) {
     const existing = await this.prisma.serviceCatalogItem.findFirst({
       where: {
+        workshopId,
         name: { equals: name, mode: 'insensitive' },
         category: { equals: category, mode: 'insensitive' },
         ...(excludeId ? { NOT: { id: excludeId } } : {}),

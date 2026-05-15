@@ -11,10 +11,12 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
 import { Role } from 'src/common/enums/role.enum';
 import { RolesGuard } from 'src/common/guards/roles.guard';
+import type { RequestUser } from 'src/common/types/request-user.type';
 import { CreateVehicleDto } from 'src/vehicles/dto/create-vehicle.dto';
 import { UpdateVehicleDto } from 'src/vehicles/dto/update-vehicle.dto';
 import { VehiclesService } from 'src/vehicles/vehicles.service';
@@ -29,31 +31,35 @@ export class VehiclesController {
   @Post()
   @Roles(Role.ADMIN, Role.ATENDENTE)
   @ApiOperation({ summary: 'Cria veículo' })
-  create(@Body() createVehicleDto: CreateVehicleDto) {
-    return this.vehiclesService.create(createVehicleDto);
+  create(@CurrentUser() user: RequestUser, @Body() createVehicleDto: CreateVehicleDto) {
+    return this.vehiclesService.create(user, createVehicleDto);
   }
 
   @Get()
   @Roles(Role.ADMIN, Role.ATENDENTE)
-  findAll(@Query() pagination: PaginationQueryDto) {
-    return this.vehiclesService.findAll(pagination);
+  findAll(@CurrentUser() user: RequestUser, @Query() pagination: PaginationQueryDto) {
+    return this.vehiclesService.findAll(user, pagination);
   }
 
   @Get(':id')
   @Roles(Role.ADMIN, Role.ATENDENTE, Role.MECANICO)
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.vehiclesService.findOne(id);
+  findOne(@CurrentUser() user: RequestUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.vehiclesService.findOne(user, id);
   }
 
   @Patch(':id')
   @Roles(Role.ADMIN, Role.ATENDENTE)
-  update(@Param('id', ParseUUIDPipe) id: string, @Body() updateVehicleDto: UpdateVehicleDto) {
-    return this.vehiclesService.update(id, updateVehicleDto);
+  update(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updateVehicleDto: UpdateVehicleDto,
+  ) {
+    return this.vehiclesService.update(user, id, updateVehicleDto);
   }
 
   @Get(':id/history')
   @Roles(Role.ADMIN, Role.ATENDENTE, Role.MECANICO)
-  getHistory(@Param('id', ParseUUIDPipe) id: string) {
-    return this.vehiclesService.getHistory(id);
+  getHistory(@CurrentUser() user: RequestUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.vehiclesService.getHistory(user, id);
   }
 }

@@ -12,16 +12,18 @@ export class CreateServiceOrderUseCase {
     private readonly referenceValidator: ServiceOrderReferenceValidatorService,
   ) {}
 
-  async execute(createServiceOrderDto: CreateServiceOrderDto) {
+  async execute(workshopId: string, createServiceOrderDto: CreateServiceOrderDto) {
     await this.referenceValidator.validate(
+      workshopId,
       createServiceOrderDto.clientId,
       createServiceOrderDto.vehicleId,
       createServiceOrderDto.mechanicId,
     );
-    const orderNumber = await buildServiceOrderNumber(this.prisma);
+    const orderNumber = await buildServiceOrderNumber(this.prisma, workshopId);
 
     return this.prisma.serviceOrder.create({
       data: {
+        workshopId,
         orderNumber,
         clientId: createServiceOrderDto.clientId,
         vehicleId: createServiceOrderDto.vehicleId,

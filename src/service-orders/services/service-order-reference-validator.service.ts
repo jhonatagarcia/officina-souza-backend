@@ -11,10 +11,10 @@ export class ServiceOrderReferenceValidatorService {
     private readonly usersService: UsersService,
   ) {}
 
-  async validate(clientId: string, vehicleId: string, mechanicId?: string) {
+  async validate(workshopId: string, clientId: string, vehicleId: string, mechanicId?: string) {
     const [client, vehicle] = await Promise.all([
-      this.clientsService.ensureExists(clientId),
-      this.vehiclesService.ensureExists(vehicleId),
+      this.clientsService.ensureExists(workshopId, clientId),
+      this.vehiclesService.ensureExists(workshopId, vehicleId),
     ]);
 
     if (vehicle.clientId !== client.id) {
@@ -22,7 +22,10 @@ export class ServiceOrderReferenceValidatorService {
     }
 
     if (mechanicId) {
-      await this.usersService.findById(mechanicId);
+      const mechanic = await this.usersService.findById(workshopId, mechanicId);
+      if (mechanic.workshopId !== workshopId) {
+        throw new BadRequestException('Mecanico informado e invalido');
+      }
     }
   }
 }

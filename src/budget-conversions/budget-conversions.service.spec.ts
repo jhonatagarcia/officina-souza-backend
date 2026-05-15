@@ -3,6 +3,13 @@ import { BudgetsService } from 'src/budgets/budgets.service';
 import { BudgetConversionsService } from 'src/budget-conversions/budget-conversions.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 
+const tenantUser = {
+  sub: 'user-1',
+  email: 'admin@local.com',
+  role: 'ADMIN' as const,
+  workshopId: 'workshop-1',
+};
+
 describe('BudgetConversionsService', () => {
   let service: BudgetConversionsService;
 
@@ -58,7 +65,7 @@ describe('BudgetConversionsService', () => {
       convertedToServiceOrder: true,
     });
 
-    const result = await service.convertToServiceOrder('budget-1');
+    const result = await service.convertToServiceOrder(tenantUser, 'budget-1');
 
     expect(result).toEqual({
       id: 'budget-1',
@@ -84,6 +91,10 @@ describe('BudgetConversionsService', () => {
         },
       }),
     );
-    expect(budgetsServiceMock.markConverted).toHaveBeenCalledWith('budget-1', prismaMock as never);
+    expect(budgetsServiceMock.markConverted).toHaveBeenCalledWith(
+      'workshop-1',
+      'budget-1',
+      prismaMock as never,
+    );
   });
 });

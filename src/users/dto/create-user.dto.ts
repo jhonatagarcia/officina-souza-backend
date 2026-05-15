@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { STRONG_PASSWORD_MESSAGE, STRONG_PASSWORD_PATTERN } from 'src/auth/utils/password-policy';
 import {
   IsBoolean,
   IsEmail,
@@ -24,8 +25,8 @@ export class CreateUserDto {
   @ApiProperty()
   @IsString()
   @MinLength(8)
-  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/, {
-    message: 'password must contain uppercase, lowercase and number',
+  @Matches(STRONG_PASSWORD_PATTERN, {
+    message: STRONG_PASSWORD_MESSAGE,
   })
   password!: string;
 

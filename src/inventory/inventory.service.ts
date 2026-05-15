@@ -8,6 +8,8 @@ import { InventoryMovementType, Prisma } from '@prisma/client';
 import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
 import { buildSafeOrderBy } from 'src/common/utils/order-by.util';
 import { buildPaginationMeta, PaginatedResponse } from 'src/common/utils/pagination.util';
+import { requireWorkshopId } from 'src/common/tenant/tenant-context';
+import type { RequestUser } from 'src/common/types/request-user.type';
 import {
   InventoryItemResponseDto,
   toInventoryItemResponseDto,
@@ -32,13 +34,19 @@ const INVENTORY_ORDERABLE_FIELDS = new Set([
 export class InventoryService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(createInventoryItemDto: CreateInventoryItemDto): Promise<InventoryItemResponseDto> {
-    const internalCode = createInventoryItemDto.internalCode ?? (await this.generateInternalCode());
+  async create(
+    user: RequestUser,
+    createInventoryItemDto: CreateInventoryItemDto,
+  ): Promise<InventoryItemResponseDto> {
+    const workshopId = requireWorkshopId(user);
+    const internalCode =
+      createInventoryItemDto.internalCode ?? (await this.generateInternalCode(workshopId));
 
-    await this.ensureUniqueCode(internalCode);
+    await this.ensureUniqueCode(workshopId, internalCode);
 
     const item = await this.prisma.inventoryItem.create({
       data: {
+        workshopId,
         name: createInventoryItemDto.name,
         internalCode,
         category: createInventoryItemDto.category,
@@ -54,17 +62,22 @@ export class InventoryService {
   }
 
   async findAll(
+    user: RequestUser,
     pagination: PaginationQueryDto,
   ): Promise<PaginatedResponse<InventoryItemResponseDto>> {
-    const where: Prisma.InventoryItemWhereInput = pagination.search
-      ? {
-          OR: [
-            { name: { contains: pagination.search, mode: 'insensitive' } },
-            { internalCode: { contains: pagination.search, mode: 'insensitive' } },
-            { category: { contains: pagination.search, mode: 'insensitive' } },
-          ],
-        }
-      : {};
+    const workshopId = requireWorkshopId(user);
+    const where: Prisma.InventoryItemWhereInput = {
+      workshopId,
+      ...(pagination.search
+        ? {
+            OR: [
+              { name: { contains: pagination.search, mode: 'insensitive' } },
+              { internalCode: { contains: pagination.search, mode: 'insensitive' } },
+              { category: { contains: pagination.search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
 
     const [data, total] = await this.prisma.$transaction([
       this.prisma.inventoryItem.findMany({
@@ -87,9 +100,10 @@ export class InventoryService {
     };
   }
 
-  async findOne(id: string): Promise<InventoryItemResponseDto> {
+  async findOne(user: RequestUser, id: string): Promise<InventoryItemResponseDto> {
+    const workshopId = requireWorkshopId(user);
     const item = await this.prisma.inventoryItem.findUnique({
-      where: { id },
+      where: { id_workshopId: { id, workshopId } },
     });
 
     if (!item) {
@@ -100,11 +114,13 @@ export class InventoryService {
   }
 
   async update(
+    user: RequestUser,
     id: string,
     updateInventoryItemDto: UpdateInventoryItemDto,
   ): Promise<InventoryItemResponseDto> {
+    const workshopId = requireWorkshopId(user);
     const currentItem = await this.prisma.inventoryItem.findUnique({
-      where: { id },
+      where: { id_workshopId: { id, workshopId } },
     });
 
     if (!currentItem) {
@@ -112,12 +128,12 @@ export class InventoryService {
     }
 
     if (updateInventoryItemDto.internalCode) {
-      await this.ensureUniqueCode(updateInventoryItemDto.internalCode, id);
+      await this.ensureUniqueCode(workshopId, updateInventoryItemDto.internalCode, id);
     }
 
     const item = await this.prisma.$transaction(async (tx) => {
       const updatedItem = await tx.inventoryItem.update({
-        where: { id },
+        where: { id_workshopId: { id, workshopId } },
         data: {
           name: updateInventoryItemDto.name,
           internalCode: updateInventoryItemDto.internalCode,
@@ -138,6 +154,7 @@ export class InventoryService {
 
         await tx.inventoryMovement.create({
           data: {
+            workshopId,
             inventoryItemId: id,
             type: InventoryMovementType.ADJUSTMENT,
             quantityChange,
@@ -156,8 +173,10 @@ export class InventoryService {
     return toInventoryItemResponseDto(item);
   }
 
-  async getLowStockAlerts(): Promise<InventoryItemResponseDto[]> {
+  async getLowStockAlerts(user: RequestUser): Promise<InventoryItemResponseDto[]> {
+    const workshopId = requireWorkshopId(user);
     const items = await this.prisma.inventoryItem.findMany({
+      where: { workshopId },
       orderBy: { quantity: 'asc' },
     });
 
@@ -166,11 +185,15 @@ export class InventoryService {
       .map(toInventoryItemResponseDto);
   }
 
-  async getMovements(inventoryItemId: string): Promise<InventoryMovementResponseDto[]> {
-    await this.findOne(inventoryItemId);
+  async getMovements(
+    user: RequestUser,
+    inventoryItemId: string,
+  ): Promise<InventoryMovementResponseDto[]> {
+    const workshopId = requireWorkshopId(user);
+    await this.ensureExists(workshopId, inventoryItemId);
 
     const movements = await this.prisma.inventoryMovement.findMany({
-      where: { inventoryItemId },
+      where: { inventoryItemId, workshopId },
       orderBy: { createdAt: 'desc' },
       take: 8,
       include: {
@@ -189,6 +212,7 @@ export class InventoryService {
     inventoryItemId: string,
     quantity: number,
     tx: Prisma.TransactionClient,
+    workshopId: string,
     context?: {
       serviceOrderId?: string;
       serviceOrderPartId?: string;
@@ -202,6 +226,7 @@ export class InventoryService {
     const result = await tx.inventoryItem.updateMany({
       where: {
         id: inventoryItemId,
+        workshopId,
         quantity: {
           gte: quantity,
         },
@@ -215,11 +240,12 @@ export class InventoryService {
 
     if (result.count > 0) {
       const updatedItem = await tx.inventoryItem.findUniqueOrThrow({
-        where: { id: inventoryItemId },
+        where: { id_workshopId: { id: inventoryItemId, workshopId } },
       });
 
       await tx.inventoryMovement.create({
         data: {
+          workshopId,
           inventoryItemId,
           serviceOrderId: context?.serviceOrderId,
           serviceOrderPartId: context?.serviceOrderPartId,
@@ -237,7 +263,7 @@ export class InventoryService {
     }
 
     const item = await tx.inventoryItem.findUnique({
-      where: { id: inventoryItemId },
+      where: { id_workshopId: { id: inventoryItemId, workshopId } },
     });
 
     if (!item) {
@@ -247,9 +273,22 @@ export class InventoryService {
     throw new BadRequestException('Quantidade insuficiente em estoque');
   }
 
-  private async ensureUniqueCode(code: string, excludeId?: string) {
+  async ensureExists(workshopId: string, id: string) {
+    const item = await this.prisma.inventoryItem.findUnique({
+      where: { id_workshopId: { id, workshopId } },
+    });
+
+    if (!item) {
+      throw new NotFoundException('Item de estoque nao encontrado');
+    }
+
+    return item;
+  }
+
+  private async ensureUniqueCode(workshopId: string, code: string, excludeId?: string) {
     const existing = await this.prisma.inventoryItem.findFirst({
       where: {
+        workshopId,
         internalCode: code,
         ...(excludeId ? { NOT: { id: excludeId } } : {}),
       },
@@ -260,9 +299,10 @@ export class InventoryService {
     }
   }
 
-  private async generateInternalCode() {
+  private async generateInternalCode(workshopId: string) {
     const lastGeneratedItem = await this.prisma.inventoryItem.findFirst({
       where: {
+        workshopId,
         internalCode: {
           startsWith: 'P-',
         },

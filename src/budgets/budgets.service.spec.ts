@@ -14,12 +14,20 @@ import { ClientsService } from 'src/clients/clients.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { VehiclesService } from 'src/vehicles/vehicles.service';
 
+const tenantUser = {
+  sub: 'user-1',
+  email: 'admin@local.com',
+  role: 'ADMIN' as const,
+  workshopId: 'workshop-1',
+};
+
 describe('BudgetsService', () => {
   let service: BudgetsService;
   const prismaMock = {
     budget: {
       create: jest.fn(),
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       update: jest.fn(),
     },
     budgetItem: {
@@ -64,7 +72,7 @@ describe('BudgetsService', () => {
     clientsServiceMock.ensureExists.mockResolvedValue({ id: 'client-1' });
     vehiclesServiceMock.ensureExists.mockResolvedValue({ id: 'vehicle-1', clientId: 'client-1' });
 
-    await service.create({
+    await service.create(tenantUser, {
       clientId: 'client-1',
       vehicleId: 'vehicle-1',
       problemDescription: 'Motor falhando',
@@ -95,7 +103,7 @@ describe('BudgetsService', () => {
     vehiclesServiceMock.ensureExists.mockResolvedValue({ id: 'vehicle-1', clientId: 'client-1' });
 
     await expect(
-      service.create({
+      service.create(tenantUser, {
         clientId: 'client-1',
         vehicleId: 'vehicle-1',
         problemDescription: 'Motor falhando',
@@ -125,9 +133,9 @@ describe('BudgetsService', () => {
       },
     };
 
-    await expect(service.assertCanConvert('budget-1', tx as never)).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+    await expect(
+      service.assertCanConvert('workshop-1', 'budget-1', tx as never),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('should block duplicate conversion', async () => {
@@ -143,9 +151,9 @@ describe('BudgetsService', () => {
       },
     };
 
-    await expect(service.assertCanConvert('budget-1', tx as never)).rejects.toBeInstanceOf(
-      ConflictException,
-    );
+    await expect(
+      service.assertCanConvert('workshop-1', 'budget-1', tx as never),
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 
   it('should block budget creation when vehicle does not belong to client', async () => {
@@ -153,7 +161,7 @@ describe('BudgetsService', () => {
     vehiclesServiceMock.ensureExists.mockResolvedValue({ id: 'vehicle-1', clientId: 'client-2' });
 
     await expect(
-      service.create({
+      service.create(tenantUser, {
         clientId: 'client-1',
         vehicleId: 'vehicle-1',
         problemDescription: 'Motor falhando',
@@ -183,7 +191,7 @@ describe('BudgetsService', () => {
     clientsServiceMock.ensureExists.mockResolvedValue({ id: 'client-1' });
     vehiclesServiceMock.ensureExists.mockResolvedValue({ id: 'vehicle-1', clientId: 'client-1' });
 
-    await service.update('budget-1', {
+    await service.update(tenantUser, 'budget-1', {
       discount: 20,
       items: [
         {
@@ -196,11 +204,11 @@ describe('BudgetsService', () => {
     });
 
     expect(prismaMock.budgetItem.deleteMany).toHaveBeenCalledWith({
-      where: { budgetId: 'budget-1' },
+      where: { budgetId: 'budget-1', budget: { workshopId: 'workshop-1' } },
     });
     expect(prismaMock.budget.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'budget-1' },
+        where: { id_workshopId: { id: 'budget-1', workshopId: 'workshop-1' } },
         data: expect.objectContaining({
           subtotal: 100,
           total: 80,
@@ -227,7 +235,7 @@ describe('BudgetsService', () => {
       serviceOrder: null,
     });
 
-    await expect(service.update('budget-1', { notes: 'novo' })).rejects.toBeInstanceOf(
+    await expect(service.update(tenantUser, 'budget-1', { notes: 'novo' })).rejects.toBeInstanceOf(
       BadRequestException,
     );
   });
@@ -240,11 +248,11 @@ describe('BudgetsService', () => {
     });
     prismaMock.budget.update.mockResolvedValue({ id: 'budget-1', status: BudgetStatus.APROVADO });
 
-    await service.approve('budget-1');
+    await service.approve(tenantUser, 'budget-1');
 
     expect(prismaMock.budget.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'budget-1' },
+        where: { id_workshopId: { id: 'budget-1', workshopId: 'workshop-1' } },
         data: expect.objectContaining({
           status: BudgetStatus.APROVADO,
           approvedAt: expect.any(Date) as Date,
@@ -256,10 +264,10 @@ describe('BudgetsService', () => {
   it('should mark budget as converted inside transaction', async () => {
     prismaMock.budget.update.mockResolvedValue({ id: 'budget-1', convertedToServiceOrder: true });
 
-    await service.markConverted('budget-1', prismaMock as never);
+    await service.markConverted('workshop-1', 'budget-1', prismaMock as never);
 
     expect(prismaMock.budget.update).toHaveBeenCalledWith({
-      where: { id: 'budget-1' },
+      where: { id_workshopId: { id: 'budget-1', workshopId: 'workshop-1' } },
       data: { convertedToServiceOrder: true },
     });
   });

@@ -7,6 +7,13 @@ import { StockOutValueService } from 'src/financial/services/stock-out-value.ser
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ServiceOrdersService } from 'src/service-orders/service-orders.service';
 
+const tenantUser = {
+  sub: 'user-1',
+  email: 'admin@local.com',
+  role: 'ADMIN' as const,
+  workshopId: 'workshop-1',
+};
+
 describe('FinancialService', () => {
   let service: FinancialService;
 
@@ -14,6 +21,7 @@ describe('FinancialService', () => {
     financialEntry: {
       create: jest.fn(),
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn(),
       findMany: jest.fn(),
@@ -55,7 +63,7 @@ describe('FinancialService', () => {
       status: FinancialStatus.VENCIDO,
     });
 
-    await service.create({
+    await service.create(tenantUser, {
       type: 'RECEIVABLE',
       description: 'Parcela atrasada',
       category: 'Servico',
@@ -79,14 +87,14 @@ describe('FinancialService', () => {
       status: FinancialStatus.VENCIDO,
     });
 
-    await service.create({
+    await service.create(tenantUser, {
       type: 'RECEIVABLE',
       description: 'Cobranca',
       category: 'Servico',
       amount: 150,
       dueDate: '2020-01-01T00:00:00.000Z',
       status: FinancialStatus.PENDENTE,
-    } as Parameters<FinancialService['create']>[0] & { status: FinancialStatus });
+    } as Parameters<FinancialService['create']>[1] & { status: FinancialStatus });
 
     expect(prismaMock.financialEntry.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -102,7 +110,7 @@ describe('FinancialService', () => {
     serviceOrdersServiceMock.ensureExists.mockResolvedValue({ id: 'os-1', clientId: 'client-2' });
 
     await expect(
-      service.create({
+      service.create(tenantUser, {
         type: 'RECEIVABLE',
         description: 'Cobrança',
         category: 'Servico',
@@ -122,7 +130,7 @@ describe('FinancialService', () => {
       serviceOrder: null,
     });
 
-    await expect(service.update('fin-1', { notes: 'x' })).rejects.toBeInstanceOf(
+    await expect(service.update(tenantUser, 'fin-1', { notes: 'x' })).rejects.toBeInstanceOf(
       BadRequestException,
     );
   });
@@ -139,11 +147,11 @@ describe('FinancialService', () => {
     });
     prismaMock.financialEntry.update.mockResolvedValue({ id: 'fin-1' });
 
-    await service.update('fin-1', { dueDate: '2030-01-01T00:00:00.000Z' });
+    await service.update(tenantUser, 'fin-1', { dueDate: '2030-01-01T00:00:00.000Z' });
 
     expect(prismaMock.financialEntry.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'fin-1' },
+        where: { id_workshopId: { id: 'fin-1', workshopId: 'workshop-1' } },
         data: expect.objectContaining({
           dueDate: new Date('2030-01-01T00:00:00.000Z'),
           status: FinancialStatus.PENDENTE,
@@ -155,7 +163,7 @@ describe('FinancialService', () => {
   it('should apply financial filters when listing entries', async () => {
     prismaMock.$transaction.mockResolvedValueOnce([[{ id: 'fin-1' }], 1]);
 
-    await service.findAll({
+    await service.findAll(tenantUser, {
       page: 1,
       limit: 10,
       search: 'OS',
@@ -174,6 +182,7 @@ describe('FinancialService', () => {
           ],
           status: 'PENDENTE',
           type: 'RECEIVABLE',
+          workshopId: 'workshop-1',
         },
       }),
     );
@@ -185,6 +194,7 @@ describe('FinancialService', () => {
         ],
         status: 'PENDENTE',
         type: 'RECEIVABLE',
+        workshopId: 'workshop-1',
       },
     });
   });
@@ -229,7 +239,7 @@ describe('FinancialService', () => {
       },
     ]);
 
-    const result = await service.getSummary();
+    const result = await service.getSummary(tenantUser);
 
     expect(result).toEqual({
       receivablesValue: new Prisma.Decimal(550),
@@ -248,6 +258,7 @@ describe('FinancialService', () => {
     );
     expect(prismaMock.serviceOrder.findMany).toHaveBeenCalledWith({
       where: {
+        workshopId: 'workshop-1',
         financialEntries: {
           some: {
             type: 'RECEIVABLE',
@@ -295,6 +306,7 @@ describe('FinancialService', () => {
           lt: expect.any(Date) as Date,
         },
         serviceOrder: {
+          workshopId: 'workshop-1',
           financialEntries: {
             none: {
               type: 'RECEIVABLE',
@@ -317,7 +329,7 @@ describe('FinancialService', () => {
     });
     prismaMock.financialEntry.update.mockResolvedValue({ id: 'fin-1' });
 
-    await service.update('fin-1', { dueDate: '2030-01-01T00:00:00.000Z' });
+    await service.update(tenantUser, 'fin-1', { dueDate: '2030-01-01T00:00:00.000Z' });
 
     expect(prismaMock.financialEntry.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -341,13 +353,13 @@ describe('FinancialService', () => {
       status: FinancialStatus.PAGO,
     });
 
-    await service.pay('fin-1', {
+    await service.pay(tenantUser, 'fin-1', {
       paymentMethod: 'PIX',
       paidAt: '2030-01-01T00:00:00.000Z',
     });
 
     expect(prismaMock.financialEntry.update).toHaveBeenCalledWith({
-      where: { id: 'fin-1' },
+      where: { id_workshopId: { id: 'fin-1', workshopId: 'workshop-1' } },
       data: {
         status: FinancialStatus.PAGO,
         paymentMethod: 'PIX',
@@ -366,7 +378,7 @@ describe('FinancialService', () => {
     });
 
     await expect(
-      service.pay('fin-1', {
+      service.pay(tenantUser, 'fin-1', {
         paymentMethod: 'PIX',
         paidAt: '2030-01-01T00:00:00.000Z',
       }),

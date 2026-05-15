@@ -208,6 +208,42 @@ class EnvironmentVariables {
   @IsOptional()
   @IsString()
   SEED_ADMIN_NAME?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => toOptionalNumber(value))
+  @IsInt()
+  @Min(5)
+  @Max(120)
+  PASSWORD_RESET_TOKEN_TTL_MINUTES?: number;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  PASSWORD_RESET_APP_URL?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  CAPTCHA_ENABLED?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  CAPTCHA_PROVIDER?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  CAPTCHA_SECRET?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  CAPTCHA_VERIFY_URL?: string;
+
+  @IsOptional()
+  @IsIn(['none', 'strict'])
+  CAPTCHA_EXPECTED_ACTION?: 'none' | 'strict';
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvironmentVariables {
@@ -258,6 +294,18 @@ function validateSecurityConstraints(config: EnvironmentVariables): void {
     if (config.ENABLE_SWAGGER === true) {
       securityErrors.push('ENABLE_SWAGGER nao pode ser true em producao');
     }
+
+    if (config.WHATSAPP_WEBHOOK_VERIFY_TOKEN?.trim() && !config.META_APP_SECRET?.trim()) {
+      securityErrors.push(
+        'META_APP_SECRET deve ser definido em producao quando webhook do WhatsApp estiver ativo',
+      );
+    }
+  }
+
+  if (config.CAPTCHA_ENABLED === true && (!config.CAPTCHA_SECRET || !config.CAPTCHA_VERIFY_URL)) {
+    securityErrors.push(
+      'CAPTCHA_SECRET e CAPTCHA_VERIFY_URL devem ser definidos quando CAPTCHA_ENABLED=true',
+    );
   }
 
   if (securityErrors.length > 0) {

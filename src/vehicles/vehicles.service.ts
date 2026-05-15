@@ -2,6 +2,8 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { Prisma } from '@prisma/client';
 import { ClientsService } from 'src/clients/clients.service';
 import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
+import { requireWorkshopId } from 'src/common/tenant/tenant-context';
+import type { RequestUser } from 'src/common/types/request-user.type';
 import { buildPaginationMeta, PaginatedResponse } from 'src/common/utils/pagination.util';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateVehicleDto } from 'src/vehicles/dto/create-vehicle.dto';
@@ -24,12 +26,14 @@ export class VehiclesService {
     private readonly clientsService: ClientsService,
   ) {}
 
-  async create(createVehicleDto: CreateVehicleDto): Promise<VehicleResponseDto> {
-    await this.clientsService.ensureExists(createVehicleDto.clientId);
-    await this.ensureUniquePlate(createVehicleDto.plate);
+  async create(user: RequestUser, createVehicleDto: CreateVehicleDto): Promise<VehicleResponseDto> {
+    const workshopId = requireWorkshopId(user);
+    await this.clientsService.ensureExists(workshopId, createVehicleDto.clientId);
+    await this.ensureUniquePlate(workshopId, createVehicleDto.plate);
 
     const vehicle = await this.prisma.vehicle.create({
       data: {
+        workshopId,
         clientId: createVehicleDto.clientId,
         plate: createVehicleDto.plate.toUpperCase(),
         brand: createVehicleDto.brand,
@@ -46,18 +50,23 @@ export class VehiclesService {
   }
 
   async findAll(
+    user: RequestUser,
     pagination: PaginationQueryDto,
   ): Promise<PaginatedResponse<VehicleDetailResponseDto>> {
-    const where: Prisma.VehicleWhereInput = pagination.search
-      ? {
-          OR: [
-            { plate: { contains: pagination.search, mode: 'insensitive' } },
-            { brand: { contains: pagination.search, mode: 'insensitive' } },
-            { model: { contains: pagination.search, mode: 'insensitive' } },
-            { client: { name: { contains: pagination.search, mode: 'insensitive' } } },
-          ],
-        }
-      : {};
+    const workshopId = requireWorkshopId(user);
+    const where: Prisma.VehicleWhereInput = {
+      workshopId,
+      ...(pagination.search
+        ? {
+            OR: [
+              { plate: { contains: pagination.search, mode: 'insensitive' } },
+              { brand: { contains: pagination.search, mode: 'insensitive' } },
+              { model: { contains: pagination.search, mode: 'insensitive' } },
+              { client: { name: { contains: pagination.search, mode: 'insensitive' } } },
+            ],
+          }
+        : {}),
+    };
 
     const sortBy = VEHICLE_ORDERABLE_FIELDS.has(pagination.sortBy ?? '')
       ? (pagination.sortBy ?? 'createdAt')
@@ -82,9 +91,10 @@ export class VehiclesService {
     };
   }
 
-  async findOne(id: string): Promise<VehicleDetailResponseDto> {
+  async findOne(user: RequestUser, id: string): Promise<VehicleDetailResponseDto> {
+    const workshopId = requireWorkshopId(user);
     const vehicle = await this.prisma.vehicle.findUnique({
-      where: { id },
+      where: { id_workshopId: { id, workshopId } },
       include: {
         client: true,
       },
@@ -97,21 +107,26 @@ export class VehiclesService {
     return toVehicleDetailResponseDto(vehicle);
   }
 
-  async update(id: string, updateVehicleDto: UpdateVehicleDto): Promise<VehicleResponseDto> {
-    await this.ensureExists(id);
+  async update(
+    user: RequestUser,
+    id: string,
+    updateVehicleDto: UpdateVehicleDto,
+  ): Promise<VehicleResponseDto> {
+    const workshopId = requireWorkshopId(user);
+    await this.ensureExists(workshopId, id);
 
     if (updateVehicleDto.clientId) {
-      await this.clientsService.ensureExists(updateVehicleDto.clientId);
+      await this.clientsService.ensureExists(workshopId, updateVehicleDto.clientId);
     }
 
     const plate = updateVehicleDto.plate?.toUpperCase();
 
     if (plate) {
-      await this.ensureUniquePlate(plate, id);
+      await this.ensureUniquePlate(workshopId, plate, id);
     }
 
     const vehicle = await this.prisma.vehicle.update({
-      where: { id },
+      where: { id_workshopId: { id, workshopId } },
       data: {
         clientId: updateVehicleDto.clientId,
         plate,
@@ -128,20 +143,21 @@ export class VehiclesService {
     return toVehicleResponseDto(vehicle);
   }
 
-  async getHistory(id: string): Promise<VehicleHistoryEntryResponseDto[]> {
-    await this.ensureExists(id);
+  async getHistory(user: RequestUser, id: string): Promise<VehicleHistoryEntryResponseDto[]> {
+    const workshopId = requireWorkshopId(user);
+    await this.ensureExists(workshopId, id);
 
     const history = await this.prisma.vehicleHistory.findMany({
-      where: { vehicleId: id },
+      where: { vehicleId: id, workshopId },
       orderBy: { entryDate: 'desc' },
     });
 
     return history.map(toVehicleHistoryEntryResponseDto);
   }
 
-  async ensureExists(id: string) {
+  async ensureExists(workshopId: string, id: string) {
     const vehicle = await this.prisma.vehicle.findUnique({
-      where: { id },
+      where: { id_workshopId: { id, workshopId } },
     });
 
     if (!vehicle) {
@@ -151,9 +167,10 @@ export class VehiclesService {
     return vehicle;
   }
 
-  private async ensureUniquePlate(plate: string, excludeId?: string) {
+  private async ensureUniquePlate(workshopId: string, plate: string, excludeId?: string) {
     const existing = await this.prisma.vehicle.findFirst({
       where: {
+        workshopId,
         plate: plate.toUpperCase(),
         ...(excludeId ? { NOT: { id: excludeId } } : {}),
       },

@@ -64,6 +64,15 @@ describe('validateEnv security constraints', () => {
     ).toThrow(/ENABLE_SWAGGER/);
   });
 
+  it('should require WhatsApp app secret when production webhook verification is configured', () => {
+    expect(() =>
+      validateEnv({
+        ...baseConfig,
+        WHATSAPP_WEBHOOK_VERIFY_TOKEN: 'verify-token',
+      }),
+    ).toThrow(/META_APP_SECRET/);
+  });
+
   it('should accept Swagger disabled in production', () => {
     expect(
       validateEnv({

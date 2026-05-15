@@ -16,19 +16,28 @@ export class CreateBudgetUseCase {
     private readonly totalsService: BudgetTotalsService,
   ) {}
 
-  async execute(createBudgetDto: CreateBudgetDto): Promise<
+  async execute(
+    workshopId: string,
+    createBudgetDto: CreateBudgetDto,
+  ): Promise<
     Prisma.BudgetGetPayload<{
       include: { items: true };
     }>
   > {
-    await this.referenceValidator.validate(createBudgetDto.clientId, createBudgetDto.vehicleId);
+    await this.referenceValidator.validate(
+      workshopId,
+      createBudgetDto.clientId,
+      createBudgetDto.vehicleId,
+    );
     const { serviceCatalogItems, inventoryItems } = await this.itemReferenceService.loadAndValidate(
+      workshopId,
       createBudgetDto.items,
     );
     const totals = this.totalsService.calculate(createBudgetDto.items, createBudgetDto.discount);
 
     return this.prisma.budget.create({
       data: {
+        workshopId,
         code: buildBudgetCode(),
         clientId: createBudgetDto.clientId,
         vehicleId: createBudgetDto.vehicleId,

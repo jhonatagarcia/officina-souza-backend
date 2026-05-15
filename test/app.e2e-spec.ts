@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/unbound-method */
 import { ExecutionContext, INestApplication, ValidationPipe, VersioningType } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
@@ -20,6 +20,13 @@ const vehicleId = '22222222-2222-4222-8222-222222222222';
 const budgetId = '33333333-3333-4333-8333-333333333333';
 const serviceOrderId = '44444444-4444-4444-8444-444444444444';
 const financialEntryId = '55555555-5555-4555-8555-555555555555';
+const workshopId = '66666666-6666-4666-8666-666666666666';
+const authenticatedUser = {
+  sub: 'user-1',
+  email: 'admin@local.com',
+  role: 'ADMIN',
+  workshopId,
+};
 
 process.env.NODE_ENV = 'test';
 process.env.PORT = '3000';
@@ -102,7 +109,7 @@ describe('AppController (e2e)', () => {
       .useValue({
         canActivate: (context: ExecutionContext) => {
           const req = context.switchToHttp().getRequest();
-          req.user = { sub: 'user-1', email: 'admin@local.com', role: 'ADMIN' };
+          req.user = authenticatedUser;
           return true;
         },
       })
@@ -238,6 +245,10 @@ describe('AppController (e2e)', () => {
       .expect(({ body }) => {
         expect(body.id).toBe(clientId);
       });
+    expect(app.get(ClientsService).create as jest.Mock).toHaveBeenCalledWith(
+      authenticatedUser,
+      expect.objectContaining({ name: 'João' }),
+    );
   });
 
   it('/api/v1/clients (POST) should validate invalid email', async () => {
@@ -263,6 +274,10 @@ describe('AppController (e2e)', () => {
       .expect(({ body }) => {
         expect(body.id).toBe(vehicleId);
       });
+    expect(app.get(VehiclesService).create as jest.Mock).toHaveBeenCalledWith(
+      authenticatedUser,
+      expect.objectContaining({ clientId }),
+    );
   });
 
   it('/api/v1/vehicles (POST) should validate vehicle year', async () => {
@@ -301,6 +316,10 @@ describe('AppController (e2e)', () => {
       .expect(({ body }) => {
         expect(body.id).toBe(budgetId);
       });
+    expect(app.get(BudgetsService).create as jest.Mock).toHaveBeenCalledWith(
+      authenticatedUser,
+      expect.objectContaining({ clientId, vehicleId }),
+    );
   });
 
   it('/api/v1/budgets (POST) should validate empty items array', async () => {
@@ -326,6 +345,9 @@ describe('AppController (e2e)', () => {
         expect(body.id).toBe(budgetId);
         expect(body.serviceOrder.id).toBe(serviceOrderId);
       });
+    expect(
+      app.get(BudgetConversionsService).convertToServiceOrder as jest.Mock,
+    ).toHaveBeenCalledWith(authenticatedUser, budgetId);
   });
 
   it('/api/v1/dashboard/summary (GET)', async () => {
@@ -337,6 +359,9 @@ describe('AppController (e2e)', () => {
         expect(body.serviceOrders.open).toBe(0);
         expect(body.inventory.lowStockItems).toEqual([]);
       });
+    expect(app.get(DashboardService).getSummary as jest.Mock).toHaveBeenCalledWith(
+      authenticatedUser,
+    );
   });
 
   it('/api/v1/financial (POST)', async () => {
@@ -351,6 +376,10 @@ describe('AppController (e2e)', () => {
         dueDate: new Date().toISOString(),
       })
       .expect(201);
+    expect(app.get(FinancialService).create as jest.Mock).toHaveBeenCalledWith(
+      authenticatedUser,
+      expect.objectContaining({ type: 'RECEIVABLE' }),
+    );
   });
 
   it('/api/v1/financial/:id/pay (PATCH)', async () => {

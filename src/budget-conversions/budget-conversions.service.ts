@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { BudgetsService } from 'src/budgets/budgets.service';
 import { ConvertBudgetResponseDto } from 'src/budget-conversions/dto/convert-budget-response.dto';
+import { requireWorkshopId } from 'src/common/tenant/tenant-context';
+import type { RequestUser } from 'src/common/types/request-user.type';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { buildServiceOrderNumber } from 'src/service-orders/utils/service-order-number.util';
 
@@ -11,13 +13,19 @@ export class BudgetConversionsService {
     private readonly budgetsService: BudgetsService,
   ) {}
 
-  async convertToServiceOrder(budgetId: string): Promise<ConvertBudgetResponseDto> {
+  async convertToServiceOrder(
+    user: RequestUser,
+    budgetId: string,
+  ): Promise<ConvertBudgetResponseDto> {
+    const workshopId = requireWorkshopId(user);
+
     return this.prisma.$transaction(async (tx) => {
-      const budget = await this.budgetsService.assertCanConvert(budgetId, tx);
-      const orderNumber = await buildServiceOrderNumber(tx);
+      const budget = await this.budgetsService.assertCanConvert(workshopId, budgetId, tx);
+      const orderNumber = await buildServiceOrderNumber(tx, workshopId);
 
       const serviceOrder = await tx.serviceOrder.create({
         data: {
+          workshopId,
           orderNumber,
           budgetId: budget.id,
           clientId: budget.clientId,
@@ -27,7 +35,7 @@ export class BudgetConversionsService {
         },
       });
 
-      const updatedBudget = await this.budgetsService.markConverted(budget.id, tx);
+      const updatedBudget = await this.budgetsService.markConverted(workshopId, budget.id, tx);
 
       return {
         id: updatedBudget.id,

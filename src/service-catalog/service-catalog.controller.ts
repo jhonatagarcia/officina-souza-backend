@@ -11,9 +11,11 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { Role } from 'src/common/enums/role.enum';
 import { RolesGuard } from 'src/common/guards/roles.guard';
+import type { RequestUser } from 'src/common/types/request-user.type';
 import { CreateServiceCatalogItemDto } from 'src/service-catalog/dto/create-service-catalog-item.dto';
 import { ListServiceCatalogItemsQueryDto } from 'src/service-catalog/dto/list-service-catalog-items-query.dto';
 import { UpdateServiceCatalogItemDto } from 'src/service-catalog/dto/update-service-catalog-item.dto';
@@ -29,40 +31,44 @@ export class ServiceCatalogController {
   @Post()
   @Roles(Role.ADMIN, Role.ATENDENTE)
   @ApiOperation({ summary: 'Cria servico do catalogo' })
-  create(@Body() createServiceCatalogItemDto: CreateServiceCatalogItemDto) {
-    return this.serviceCatalogService.create(createServiceCatalogItemDto);
+  create(
+    @CurrentUser() user: RequestUser,
+    @Body() createServiceCatalogItemDto: CreateServiceCatalogItemDto,
+  ) {
+    return this.serviceCatalogService.create(user, createServiceCatalogItemDto);
   }
 
   @Get()
   @Roles(Role.ADMIN, Role.ATENDENTE, Role.MECANICO, Role.FINANCEIRO)
-  findAll(@Query() query: ListServiceCatalogItemsQueryDto) {
-    return this.serviceCatalogService.findAll(query);
+  findAll(@CurrentUser() user: RequestUser, @Query() query: ListServiceCatalogItemsQueryDto) {
+    return this.serviceCatalogService.findAll(user, query);
   }
 
   @Get(':id')
   @Roles(Role.ADMIN, Role.ATENDENTE, Role.MECANICO, Role.FINANCEIRO)
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.serviceCatalogService.findOne(id);
+  findOne(@CurrentUser() user: RequestUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.serviceCatalogService.findOne(user, id);
   }
 
   @Patch(':id')
   @Roles(Role.ADMIN, Role.ATENDENTE)
   update(
     @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: RequestUser,
     @Body() updateServiceCatalogItemDto: UpdateServiceCatalogItemDto,
   ) {
-    return this.serviceCatalogService.update(id, updateServiceCatalogItemDto);
+    return this.serviceCatalogService.update(user, id, updateServiceCatalogItemDto);
   }
 
   @Patch(':id/activate')
   @Roles(Role.ADMIN, Role.ATENDENTE)
-  activate(@Param('id', ParseUUIDPipe) id: string) {
-    return this.serviceCatalogService.activate(id);
+  activate(@CurrentUser() user: RequestUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.serviceCatalogService.activate(user, id);
   }
 
   @Patch(':id/deactivate')
   @Roles(Role.ADMIN, Role.ATENDENTE)
-  deactivate(@Param('id', ParseUUIDPipe) id: string) {
-    return this.serviceCatalogService.deactivate(id);
+  deactivate(@CurrentUser() user: RequestUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.serviceCatalogService.deactivate(user, id);
   }
 }

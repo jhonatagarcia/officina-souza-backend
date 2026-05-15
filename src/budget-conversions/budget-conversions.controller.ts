@@ -1,10 +1,12 @@
 import { Controller, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { Role } from 'src/common/enums/role.enum';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { BudgetConversionsService } from 'src/budget-conversions/budget-conversions.service';
+import type { RequestUser } from 'src/common/types/request-user.type';
 
 @ApiTags('Budgets')
 @ApiBearerAuth()
@@ -16,7 +18,7 @@ export class BudgetConversionsController {
   @Post(':id/convert-to-service-order')
   @Roles(Role.ADMIN, Role.ATENDENTE)
   @ApiOperation({ summary: 'Converte orçamento aprovado em ordem de serviço' })
-  convertToServiceOrder(@Param('id', ParseUUIDPipe) id: string) {
-    return this.budgetConversionsService.convertToServiceOrder(id);
+  convertToServiceOrder(@CurrentUser() user: RequestUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.budgetConversionsService.convertToServiceOrder(user, id);
   }
 }

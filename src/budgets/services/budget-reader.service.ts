@@ -5,9 +5,9 @@ import { PrismaService } from 'src/prisma/prisma.service';
 export class BudgetReaderService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async ensureExists(id: string) {
+  async ensureExists(workshopId: string, id: string) {
     const budget = await this.prisma.budget.findUnique({
-      where: { id },
+      where: { id_workshopId: { id, workshopId } },
       include: { serviceOrder: true },
     });
 

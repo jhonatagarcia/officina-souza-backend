@@ -1,15 +1,19 @@
 interface ServiceOrderNumberReader {
   serviceOrder: {
     findMany(args: {
-      where: { orderNumber: { startsWith: string } };
+      where: { workshopId: string; orderNumber: { startsWith: string } };
       select: { orderNumber: true };
     }): Promise<Array<{ orderNumber: string }>>;
   };
 }
 
-export async function buildServiceOrderNumber(prisma: ServiceOrderNumberReader): Promise<string> {
+export async function buildServiceOrderNumber(
+  prisma: ServiceOrderNumberReader,
+  workshopId: string,
+): Promise<string> {
   const existingOrderNumbers = await prisma.serviceOrder.findMany({
     where: {
+      workshopId,
       orderNumber: {
         startsWith: 'OS',
       },

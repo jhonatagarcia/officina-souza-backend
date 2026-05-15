@@ -20,9 +20,9 @@ export class UpdateServiceOrderStatusUseCase {
     private readonly logger: Logger,
   ) {}
 
-  async execute(id: string, updateStatusDto: UpdateServiceOrderStatusDto) {
+  async execute(workshopId: string, id: string, updateStatusDto: UpdateServiceOrderStatusDto) {
     const serviceOrder = await this.prisma.serviceOrder.findUnique({
-      where: { id },
+      where: { id_workshopId: { id, workshopId } },
     });
 
     if (!serviceOrder) {
@@ -46,20 +46,20 @@ export class UpdateServiceOrderStatusUseCase {
 
     const updatedServiceOrder = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.serviceOrder.update({
-        where: { id },
+        where: { id_workshopId: { id, workshopId } },
         data: updateData,
       });
 
       if (updateStatusDto.status === ServiceOrderStatus.FINALIZADA && updated.budgetId) {
-        await this.consumeBudgetInventoryItems(updated.id, tx);
+        await this.consumeBudgetInventoryItems(workshopId, updated.id, tx);
       }
 
       if (updateStatusDto.status === ServiceOrderStatus.FINALIZADA) {
-        await this.registerHistory(updated.id, tx);
+        await this.registerHistory(workshopId, updated.id, tx);
       }
 
       if (updateStatusDto.status === ServiceOrderStatus.ENTREGUE) {
-        await this.createReceivableEntry(updated.id, tx);
+        await this.createReceivableEntry(workshopId, updated.id, tx);
       }
 
       return updated;
@@ -152,9 +152,13 @@ export class UpdateServiceOrderStatusUseCase {
     return error instanceof Error ? error.name : 'UnknownError';
   }
 
-  private async registerHistory(serviceOrderId: string, tx: Prisma.TransactionClient) {
+  private async registerHistory(
+    workshopId: string,
+    serviceOrderId: string,
+    tx: Prisma.TransactionClient,
+  ) {
     const serviceOrder = await tx.serviceOrder.findUnique({
-      where: { id: serviceOrderId },
+      where: { id_workshopId: { id: serviceOrderId, workshopId } },
       include: {
         vehicle: true,
         parts: {
@@ -173,7 +177,7 @@ export class UpdateServiceOrderStatusUseCase {
       .join(', ');
 
     const existingHistory = await tx.vehicleHistory.findFirst({
-      where: { serviceOrderId: serviceOrder.id },
+      where: { serviceOrderId: serviceOrder.id, workshopId },
     });
 
     if (existingHistory) {
@@ -185,6 +189,7 @@ export class UpdateServiceOrderStatusUseCase {
           servicesSummary: serviceOrder.servicesPerformed ?? serviceOrder.problemDescription,
           partsSummary: partsSummary || null,
           totalAmount: serviceOrder.budget?.total ?? null,
+          workshopId,
         },
       });
 
@@ -193,6 +198,7 @@ export class UpdateServiceOrderStatusUseCase {
 
     await tx.vehicleHistory.create({
       data: {
+        workshopId,
         vehicleId: serviceOrder.vehicleId,
         serviceOrderId: serviceOrder.id,
         entryDate: serviceOrder.finishedAt ?? new Date(),
@@ -204,9 +210,13 @@ export class UpdateServiceOrderStatusUseCase {
     });
   }
 
-  private async consumeBudgetInventoryItems(serviceOrderId: string, tx: Prisma.TransactionClient) {
+  private async consumeBudgetInventoryItems(
+    workshopId: string,
+    serviceOrderId: string,
+    tx: Prisma.TransactionClient,
+  ) {
     const serviceOrder = await tx.serviceOrder.findUnique({
-      where: { id: serviceOrderId },
+      where: { id_workshopId: { id: serviceOrderId, workshopId } },
       include: {
         parts: true,
         budget: {
@@ -240,6 +250,7 @@ export class UpdateServiceOrderStatusUseCase {
       const result = await tx.inventoryItem.updateMany({
         where: {
           id: item.inventoryItemId,
+          workshopId,
           quantity: { gte: item.quantity },
         },
         data: {
@@ -254,7 +265,7 @@ export class UpdateServiceOrderStatusUseCase {
       }
 
       const updatedInventoryItem = await tx.inventoryItem.findUniqueOrThrow({
-        where: { id: item.inventoryItemId },
+        where: { id_workshopId: { id: item.inventoryItemId, workshopId } },
       });
 
       const serviceOrderPart = await tx.serviceOrderPart.create({
@@ -269,6 +280,7 @@ export class UpdateServiceOrderStatusUseCase {
 
       await tx.inventoryMovement.create({
         data: {
+          workshopId,
           inventoryItemId: item.inventoryItemId,
           serviceOrderId,
           serviceOrderPartId: serviceOrderPart.id,
@@ -284,9 +296,13 @@ export class UpdateServiceOrderStatusUseCase {
     }
   }
 
-  private async createReceivableEntry(serviceOrderId: string, tx: Prisma.TransactionClient) {
+  private async createReceivableEntry(
+    workshopId: string,
+    serviceOrderId: string,
+    tx: Prisma.TransactionClient,
+  ) {
     const serviceOrder = await tx.serviceOrder.findUnique({
-      where: { id: serviceOrderId },
+      where: { id_workshopId: { id: serviceOrderId, workshopId } },
       include: {
         budget: true,
         parts: {
@@ -323,6 +339,7 @@ export class UpdateServiceOrderStatusUseCase {
 
     await tx.financialEntry.create({
       data: {
+        workshopId,
         type: FinancialEntryType.RECEIVABLE,
         description: `Cobranca da ${serviceOrder.orderNumber}`,
         category: 'Ordem de Servico',

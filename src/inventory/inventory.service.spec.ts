@@ -3,6 +3,13 @@ import { Test } from '@nestjs/testing';
 import { InventoryService } from 'src/inventory/inventory.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 
+const tenantUser = {
+  sub: 'user-1',
+  email: 'admin@local.com',
+  role: 'ADMIN' as const,
+  workshopId: 'workshop-1',
+};
+
 describe('InventoryService', () => {
   let service: InventoryService;
 
@@ -33,7 +40,7 @@ describe('InventoryService', () => {
     prismaMock.inventoryItem.findFirst.mockResolvedValue({ id: 'item-1' });
 
     await expect(
-      service.create({
+      service.create(tenantUser, {
         name: 'Filtro de óleo',
         internalCode: 'F-001',
         quantity: 10,
@@ -57,7 +64,7 @@ describe('InventoryService', () => {
       cost: 10,
     });
 
-    await service.create({
+    await service.create(tenantUser, {
       name: 'Filtro de óleo',
       quantity: 10,
       minimumQuantity: 2,
@@ -81,7 +88,7 @@ describe('InventoryService', () => {
       { id: '5', quantity: 16, minimumQuantity: 10 },
     ]);
 
-    const result = await service.getLowStockAlerts();
+    const result = await service.getLowStockAlerts(tenantUser);
 
     expect(result).toHaveLength(3);
     expect(result.map((item) => item.id)).toEqual(['1', '3', '4']);
@@ -99,11 +106,12 @@ describe('InventoryService', () => {
       },
     };
 
-    const result = await service.reserveOrConsumePart('item-1', 3, tx as never);
+    const result = await service.reserveOrConsumePart('item-1', 3, tx as never, 'workshop-1');
 
     expect(tx.inventoryItem.updateMany).toHaveBeenCalledWith({
       where: {
         id: 'item-1',
+        workshopId: 'workshop-1',
         quantity: {
           gte: 3,
         },
@@ -141,9 +149,9 @@ describe('InventoryService', () => {
       },
     };
 
-    await expect(service.reserveOrConsumePart('item-1', 0, tx as never)).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+    await expect(
+      service.reserveOrConsumePart('item-1', 0, tx as never, 'workshop-1'),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('should throw not found when reserve target does not exist', async () => {
@@ -155,9 +163,9 @@ describe('InventoryService', () => {
       },
     };
 
-    await expect(service.reserveOrConsumePart('item-1', 2, tx as never)).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      service.reserveOrConsumePart('item-1', 3, tx as never, 'workshop-1'),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('should block reserve when available quantity is insufficient', async () => {
@@ -169,8 +177,8 @@ describe('InventoryService', () => {
       },
     };
 
-    await expect(service.reserveOrConsumePart('item-1', 2, tx as never)).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+    await expect(
+      service.reserveOrConsumePart('item-1', 3, tx as never, 'workshop-1'),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 });

@@ -22,6 +22,7 @@ import { ServiceOrdersModule } from 'src/service-orders/service-orders.module';
 import { UsersModule } from 'src/users/users.module';
 import { VehiclesModule } from 'src/vehicles/vehicles.module';
 import { HealthModule } from 'src/health/health.module';
+import { WorkshopsModule } from 'src/workshops/workshops.module';
 
 @Module({
   imports: [
@@ -37,7 +38,14 @@ import { HealthModule } from 'src/health/health.module';
         pinoHttp: {
           level: configService.getOrThrow<string>('logging.level'),
           redact: {
-            paths: ['req.headers.authorization', 'req.body.password', 'res.headers["set-cookie"]'],
+            paths: [
+              'req.headers.authorization',
+              'req.body.password',
+              'req.body.passwordConfirmation',
+              'req.body.token',
+              'req.body.captchaToken',
+              'res.headers["set-cookie"]',
+            ],
             censor: '[REDACTED]',
           },
         },
@@ -66,6 +74,7 @@ import { HealthModule } from 'src/health/health.module';
     NotificationsModule,
     FinancialModule,
     DashboardModule,
+    WorkshopsModule,
     HealthModule,
   ],
   providers: [

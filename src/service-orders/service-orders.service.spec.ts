@@ -22,6 +22,13 @@ function toDateInputValue(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
+const tenantUser = {
+  sub: 'user-1',
+  email: 'admin@local.com',
+  role: 'ADMIN' as const,
+  workshopId: 'workshop-1',
+};
+
 describe('ServiceOrdersService', () => {
   let service: ServiceOrdersService;
 
@@ -30,6 +37,7 @@ describe('ServiceOrdersService', () => {
       create: jest.fn(),
       findMany: jest.fn(),
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       update: jest.fn(),
     },
     financialEntry: {
@@ -74,6 +82,7 @@ describe('ServiceOrdersService', () => {
       async (callback: (tx: typeof prismaMock) => unknown) => callback(prismaMock),
     );
     prismaMock.serviceOrder.findMany.mockResolvedValue([]);
+    usersServiceMock.findById.mockResolvedValue({ id: 'user-1', workshopId: 'workshop-1' });
     notificationPublisherMock.publishServiceOrderStatusChanged.mockResolvedValue({
       status: 'QUEUED',
       jobId: 'job-1',
@@ -110,7 +119,7 @@ describe('ServiceOrdersService', () => {
     });
 
     await expect(
-      service.updateStatus('os-1', { status: ServiceOrderStatus.ENTREGUE }),
+      service.updateStatus(tenantUser, 'os-1', { status: ServiceOrderStatus.ENTREGUE }),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
@@ -139,7 +148,7 @@ describe('ServiceOrdersService', () => {
     prismaMock.vehicleHistory.findFirst.mockResolvedValue(null);
     prismaMock.vehicleHistory.create.mockResolvedValue({ id: 'history-1' });
 
-    const result = await service.updateStatus('os-1', {
+    const result = await service.updateStatus(tenantUser, 'os-1', {
       status: ServiceOrderStatus.FINALIZADA,
     });
 
@@ -158,7 +167,9 @@ describe('ServiceOrdersService', () => {
       status: ServiceOrderStatus.EM_ANDAMENTO,
     });
 
-    const result = await service.updateStatus('os-1', { status: ServiceOrderStatus.EM_ANDAMENTO });
+    const result = await service.updateStatus(tenantUser, 'os-1', {
+      status: ServiceOrderStatus.EM_ANDAMENTO,
+    });
 
     expect(result.whatsappNotification).toEqual({
       status: 'SKIPPED',
@@ -177,7 +188,7 @@ describe('ServiceOrdersService', () => {
       status: ServiceOrderStatus.EM_ANDAMENTO,
     });
 
-    const result = await service.updateStatus('os-1', {
+    const result = await service.updateStatus(tenantUser, 'os-1', {
       status: ServiceOrderStatus.EM_ANDAMENTO,
     });
 
@@ -215,7 +226,7 @@ describe('ServiceOrdersService', () => {
     prismaMock.vehicleHistory.findFirst.mockResolvedValue(null);
     prismaMock.vehicleHistory.create.mockResolvedValue({ id: 'history-1' });
 
-    const result = await service.updateStatus('os-1', {
+    const result = await service.updateStatus(tenantUser, 'os-1', {
       status: ServiceOrderStatus.FINALIZADA,
     });
 
@@ -250,7 +261,7 @@ describe('ServiceOrdersService', () => {
     });
     prismaMock.financialEntry.create.mockResolvedValue({ id: 'fin-1' });
 
-    const result = await service.updateStatus('os-1', {
+    const result = await service.updateStatus(tenantUser, 'os-1', {
       status: ServiceOrderStatus.ENTREGUE,
     });
 
@@ -276,7 +287,7 @@ describe('ServiceOrdersService', () => {
       status: ServiceOrderStatus.EM_ANDAMENTO,
     });
 
-    const result = await service.updateStatus('os-1', {
+    const result = await service.updateStatus(tenantUser, 'os-1', {
       status: ServiceOrderStatus.EM_ANDAMENTO,
     });
 
@@ -319,7 +330,7 @@ describe('ServiceOrdersService', () => {
     prismaMock.vehicleHistory.findFirst.mockResolvedValue({ id: 'history-1' });
     prismaMock.vehicleHistory.update.mockResolvedValue({ id: 'history-1' });
 
-    await service.updateStatus('os-1', { status: ServiceOrderStatus.FINALIZADA });
+    await service.updateStatus(tenantUser, 'os-1', { status: ServiceOrderStatus.FINALIZADA });
 
     expect(prismaMock.vehicleHistory.update).toHaveBeenCalled();
     expect(prismaMock.vehicleHistory.create).not.toHaveBeenCalled();
@@ -348,7 +359,7 @@ describe('ServiceOrdersService', () => {
     });
     prismaMock.financialEntry.create.mockResolvedValue({ id: 'fin-1' });
 
-    const result = await service.updateStatus('os-1', {
+    const result = await service.updateStatus(tenantUser, 'os-1', {
       status: ServiceOrderStatus.ENTREGUE,
     });
 
@@ -358,11 +369,12 @@ describe('ServiceOrdersService', () => {
         type: 'RECEIVABLE',
         description: 'Cobranca da OS-123',
         category: 'Ordem de Servico',
-        amount: expect.any(Object) as Prisma.Decimal,
+        amount: expect.anything() as Prisma.Decimal,
         dueDate: deliveredAt,
         status: 'PENDENTE',
         clientId: 'client-1',
         serviceOrderId: 'os-1',
+        workshopId: 'workshop-1',
       },
     });
   });
@@ -387,7 +399,7 @@ describe('ServiceOrdersService', () => {
       deliveredAt: new Date('2030-01-01T12:00:00.000Z'),
     });
 
-    await service.updateStatus('os-1', { status: ServiceOrderStatus.ENTREGUE });
+    await service.updateStatus(tenantUser, 'os-1', { status: ServiceOrderStatus.ENTREGUE });
 
     expect(prismaMock.financialEntry.create).not.toHaveBeenCalled();
   });
@@ -416,7 +428,7 @@ describe('ServiceOrdersService', () => {
     });
     prismaMock.financialEntry.create.mockResolvedValue({ id: 'fin-1' });
 
-    await service.updateStatus('os-1', {
+    await service.updateStatus(tenantUser, 'os-1', {
       status: ServiceOrderStatus.ENTREGUE,
     });
 
@@ -425,11 +437,12 @@ describe('ServiceOrdersService', () => {
         type: 'RECEIVABLE',
         description: 'Cobranca da OS-123',
         category: 'Ordem de Servico',
-        amount: expect.any(Prisma.Decimal) as Prisma.Decimal,
+        amount: expect.anything() as Prisma.Decimal,
         dueDate: deliveredAt,
         status: 'PENDENTE',
         clientId: 'client-1',
         serviceOrderId: 'os-1',
+        workshopId: 'workshop-1',
       },
     });
   });
@@ -447,11 +460,11 @@ describe('ServiceOrdersService', () => {
       expectedDeliveryAt: new Date('2030-01-02T12:00:00.000Z'),
     });
 
-    await service.update('os-1', { expectedDeliveryAt });
+    await service.update(tenantUser, 'os-1', { expectedDeliveryAt });
 
     expect(prismaMock.serviceOrder.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'os-1' },
+        where: { id_workshopId: { id: 'os-1', workshopId: 'workshop-1' } },
         data: expect.objectContaining({
           expectedDeliveryAt: new Date('2030-01-02T12:00:00.000Z'),
         }) as { expectedDeliveryAt: Date },
@@ -471,11 +484,11 @@ describe('ServiceOrdersService', () => {
       expectedDeliveryAt: new Date('2030-01-02T12:00:00.000Z'),
     });
 
-    await service.update('os-1', { expectedDeliveryAt: '2030-01-02T23:59:59.000Z' });
+    await service.update(tenantUser, 'os-1', { expectedDeliveryAt: '2030-01-02T23:59:59.000Z' });
 
     expect(prismaMock.serviceOrder.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'os-1' },
+        where: { id_workshopId: { id: 'os-1', workshopId: 'workshop-1' } },
         data: expect.objectContaining({
           expectedDeliveryAt: new Date('2030-01-02T12:00:00.000Z'),
         }) as { expectedDeliveryAt: Date },
@@ -495,11 +508,11 @@ describe('ServiceOrdersService', () => {
       expectedDeliveryAt: null,
     });
 
-    await service.update('os-1', { expectedDeliveryAt: null });
+    await service.update(tenantUser, 'os-1', { expectedDeliveryAt: null });
 
     expect(prismaMock.serviceOrder.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'os-1' },
+        where: { id_workshopId: { id: 'os-1', workshopId: 'workshop-1' } },
         data: expect.objectContaining({
           expectedDeliveryAt: null,
         }) as { expectedDeliveryAt: null },
@@ -519,7 +532,7 @@ describe('ServiceOrdersService', () => {
     yesterday.setDate(yesterday.getDate() - 1);
 
     await expect(
-      service.update('os-1', { expectedDeliveryAt: toDateInputValue(yesterday) }),
+      service.update(tenantUser, 'os-1', { expectedDeliveryAt: toDateInputValue(yesterday) }),
     ).rejects.toThrow(BadRequestException);
 
     expect(prismaMock.serviceOrder.update).not.toHaveBeenCalled();
@@ -607,7 +620,7 @@ describe('ServiceOrdersService', () => {
       parts: [],
     });
 
-    const result = await service.findOne('os-1');
+    const result = await service.findOne(tenantUser, 'os-1');
 
     expect(result.partsTotal.toNumber()).toBe(70);
     expect(result.laborTotal.toNumber()).toBe(110);
@@ -637,7 +650,7 @@ describe('ServiceOrdersService', () => {
       },
     });
 
-    await service.addPart('os-1', {
+    await service.addPart(tenantUser, 'os-1', {
       inventoryItemId: 'item-1',
       quantity: 3,
       unitPrice: 15,
@@ -647,6 +660,7 @@ describe('ServiceOrdersService', () => {
       'item-1',
       3,
       prismaMock,
+      'workshop-1',
       expect.objectContaining({
         serviceOrderId: 'os-1',
         serviceOrderPartId: 'part-1',
@@ -683,7 +697,7 @@ describe('ServiceOrdersService', () => {
       },
     });
 
-    await service.addPart('os-1', {
+    await service.addPart(tenantUser, 'os-1', {
       inventoryItemId: 'item-2',
       quantity: 1,
       unitPrice: 99.9,
@@ -707,7 +721,7 @@ describe('ServiceOrdersService', () => {
     vehiclesServiceMock.ensureExists.mockResolvedValue({ id: 'vehicle-1', clientId: 'client-2' });
 
     await expect(
-      service.create({
+      service.create(tenantUser, {
         clientId: 'client-1',
         vehicleId: 'vehicle-1',
         problemDescription: 'Teste',
@@ -720,19 +734,21 @@ describe('ServiceOrdersService', () => {
     vehiclesServiceMock.ensureExists.mockResolvedValue({ id: 'vehicle-1', clientId: 'client-1' });
     prismaMock.serviceOrder.create.mockResolvedValue({ id: 'os-1' });
 
-    await service.create({
+    await service.create(tenantUser, {
       clientId: 'client-1',
       vehicleId: 'vehicle-1',
       mechanicId: 'user-1',
       problemDescription: 'Teste',
     });
 
-    expect(usersServiceMock.findById).toHaveBeenCalledWith('user-1');
+    expect(usersServiceMock.findById).toHaveBeenCalledWith('workshop-1', 'user-1');
   });
 
   it('should throw when service order does not exist', async () => {
     prismaMock.serviceOrder.findUnique.mockResolvedValue(null);
 
-    await expect(service.ensureExists('missing')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.ensureExists('workshop-1', 'missing')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 });

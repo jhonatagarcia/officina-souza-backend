@@ -123,11 +123,22 @@ type FinancialSeed = [
 
 async function main(): Promise<void> {
   const demoPasswordHash = await bcrypt.hash('Demo@123456', 10);
+  const workshop = await prisma.workshop.upsert({
+    where: { id: '00000000-0000-4000-8000-000000000001' },
+    update: { tradeName: 'Oficina Demonstração' },
+    create: {
+      id: '00000000-0000-4000-8000-000000000001',
+      tradeName: 'Oficina Demonstração',
+      cnpj: '11222333000181',
+    },
+  });
+  const workshopId = workshop.id;
 
   await prisma.user.upsert({
     where: { email: 'demo.admin@oficina.local' },
-    update: { passwordHash: demoPasswordHash },
+    update: { passwordHash: demoPasswordHash, workshopId },
     create: {
+      workshopId,
       name: 'Marina Costa',
       email: 'demo.admin@oficina.local',
       passwordHash: demoPasswordHash,
@@ -137,8 +148,9 @@ async function main(): Promise<void> {
 
   const mechanic = await prisma.user.upsert({
     where: { email: 'demo.mecanico@oficina.local' },
-    update: { passwordHash: demoPasswordHash },
+    update: { passwordHash: demoPasswordHash, workshopId },
     create: {
+      workshopId,
       name: 'Rafael Almeida',
       email: 'demo.mecanico@oficina.local',
       passwordHash: demoPasswordHash,
@@ -222,9 +234,9 @@ async function main(): Promise<void> {
       ] satisfies ClientSeed[]
     ).map(([name, document, phone, email, notes]) =>
       prisma.client.upsert({
-        where: { document },
+        where: { workshopId_document: { workshopId, document } },
         update: { phone },
-        create: { name, document, phone, email, notes },
+        create: { workshopId, name, document, phone, email, notes },
       }),
     ),
   );
@@ -345,9 +357,10 @@ async function main(): Promise<void> {
       ] satisfies VehicleSeed[]
     ).map(([clientIndex, plate, brand, model, year, color, mileage, fuel, notes]) =>
       prisma.vehicle.upsert({
-        where: { plate: String(plate) },
+        where: { workshopId_plate: { workshopId, plate: String(plate) } },
         update: {},
         create: {
+          workshopId,
           clientId: byIndex(clients, clientIndex).id,
           plate: String(plate),
           brand: String(brand),
@@ -464,9 +477,10 @@ async function main(): Promise<void> {
       ] satisfies InventorySeed[]
     ).map(([internalCode, name, category, supplier, quantity, minimumQuantity, cost, salePrice]) =>
       prisma.inventoryItem.upsert({
-        where: { internalCode: String(internalCode) },
+        where: { workshopId_internalCode: { workshopId, internalCode: String(internalCode) } },
         update: {},
         create: {
+          workshopId,
           internalCode: String(internalCode),
           name: String(name),
           category: String(category),
@@ -576,9 +590,10 @@ async function main(): Promise<void> {
         warrantyDays,
       ]) =>
         prisma.serviceCatalogItem.upsert({
-          where: { code: String(code) },
+          where: { workshopId_code: { workshopId, code: String(code) } },
           update: {},
           create: {
+            workshopId,
             code: String(code),
             name: String(name),
             category: String(category),
@@ -837,9 +852,10 @@ async function main(): Promise<void> {
       0,
     );
     const budget = await prisma.budget.upsert({
-      where: { code: definition.code },
+      where: { workshopId_code: { workshopId, code: definition.code } },
       update: {},
       create: {
+        workshopId,
         code: definition.code,
         clientId: byIndex(clients, definition.clientIndex).id,
         vehicleId: byIndex(vehicles, definition.vehicleIndex).id,
@@ -964,9 +980,10 @@ async function main(): Promise<void> {
 
   for (const definition of orderDefinitions) {
     const serviceOrder = await prisma.serviceOrder.upsert({
-      where: { orderNumber: definition.orderNumber },
+      where: { workshopId_orderNumber: { workshopId, orderNumber: definition.orderNumber } },
       update: {},
       create: {
+        workshopId,
         orderNumber: definition.orderNumber,
         budgetId:
           definition.budgetIndex !== undefined
@@ -1015,9 +1032,10 @@ async function main(): Promise<void> {
     }
 
     await prisma.vehicleHistory.upsert({
-      where: { serviceOrderId: serviceOrder.id },
+      where: { workshopId_serviceOrderId: { workshopId, serviceOrderId: serviceOrder.id } },
       update: {},
       create: {
+        workshopId,
         vehicleId: byIndex(vehicles, definition.vehicleIndex).id,
         serviceOrderId: serviceOrder.id,
         entryDate: definition.deliveredDays
@@ -1209,6 +1227,7 @@ async function main(): Promise<void> {
       update: {},
       create: {
         id: String(key),
+        workshopId,
         type,
         description: String(description),
         category: String(category),

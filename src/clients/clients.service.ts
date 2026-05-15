@@ -12,6 +12,8 @@ import { buildPaginationMeta, PaginatedResponse } from 'src/common/utils/paginat
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateClientDto } from 'src/clients/dto/create-client.dto';
 import { UpdateClientDto } from 'src/clients/dto/update-client.dto';
+import { requireWorkshopId } from 'src/common/tenant/tenant-context';
+import type { RequestUser } from 'src/common/types/request-user.type';
 
 const CLIENT_ORDERABLE_FIELDS = new Set(['name', 'createdAt', 'updatedAt'] as const);
 
@@ -19,10 +21,12 @@ const CLIENT_ORDERABLE_FIELDS = new Set(['name', 'createdAt', 'updatedAt'] as co
 export class ClientsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(createClientDto: CreateClientDto): Promise<ClientResponseDto> {
+  async create(user: RequestUser, createClientDto: CreateClientDto): Promise<ClientResponseDto> {
+    const workshopId = requireWorkshopId(user);
+
     if (createClientDto.document) {
-      const existing = await this.prisma.client.findUnique({
-        where: { document: createClientDto.document },
+      const existing = await this.prisma.client.findFirst({
+        where: { workshopId, document: createClientDto.document },
       });
 
       if (existing) {
@@ -31,14 +35,19 @@ export class ClientsService {
     }
 
     const client = await this.prisma.client.create({
-      data: createClientDto,
+      data: { ...createClientDto, workshopId },
     });
 
     return toClientResponseDto(client);
   }
 
-  async findAll(pagination: PaginationQueryDto): Promise<PaginatedResponse<ClientResponseDto>> {
+  async findAll(
+    user: RequestUser,
+    pagination: PaginationQueryDto,
+  ): Promise<PaginatedResponse<ClientResponseDto>> {
+    const workshopId = requireWorkshopId(user);
     const where: Prisma.ClientWhereInput = {
+      workshopId,
       ...(pagination.search
         ? {
             OR: [
@@ -72,9 +81,10 @@ export class ClientsService {
     };
   }
 
-  async findOne(id: string): Promise<ClientDetailResponseDto> {
+  async findOne(user: RequestUser, id: string): Promise<ClientDetailResponseDto> {
+    const workshopId = requireWorkshopId(user);
     const client = await this.prisma.client.findUnique({
-      where: { id },
+      where: { id_workshopId: { id, workshopId } },
       include: {
         vehicles: true,
       },
@@ -87,13 +97,19 @@ export class ClientsService {
     return toClientDetailResponseDto(client);
   }
 
-  async update(id: string, updateClientDto: UpdateClientDto): Promise<ClientResponseDto> {
-    await this.ensureExists(id);
+  async update(
+    user: RequestUser,
+    id: string,
+    updateClientDto: UpdateClientDto,
+  ): Promise<ClientResponseDto> {
+    const workshopId = requireWorkshopId(user);
+    await this.ensureExists(workshopId, id);
 
     if (updateClientDto.document) {
       const existing = await this.prisma.client.findFirst({
         where: {
           document: updateClientDto.document,
+          workshopId,
           NOT: { id },
         },
       });
@@ -104,27 +120,28 @@ export class ClientsService {
     }
 
     const client = await this.prisma.client.update({
-      where: { id },
+      where: { id_workshopId: { id, workshopId } },
       data: updateClientDto,
     });
 
     return toClientResponseDto(client);
   }
 
-  async remove(id: string): Promise<ClientResponseDto> {
-    await this.ensureExists(id);
+  async remove(user: RequestUser, id: string): Promise<ClientResponseDto> {
+    const workshopId = requireWorkshopId(user);
+    await this.ensureExists(workshopId, id);
 
     const client = await this.prisma.client.update({
-      where: { id },
+      where: { id_workshopId: { id, workshopId } },
       data: { isActive: false },
     });
 
     return toClientResponseDto(client);
   }
 
-  async ensureExists(id: string) {
-    const client = await this.prisma.client.findFirst({
-      where: { id, isActive: true },
+  async ensureExists(workshopId: string, id: string) {
+    const client = await this.prisma.client.findUnique({
+      where: { id_workshopId: { id, workshopId }, isActive: true },
     });
 
     if (!client) {

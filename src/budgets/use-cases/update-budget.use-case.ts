@@ -18,10 +18,11 @@ export class UpdateBudgetUseCase {
   ) {}
 
   async execute(
+    workshopId: string,
     id: string,
     updateBudgetDto: UpdateBudgetDto,
   ): Promise<Prisma.BudgetGetPayload<{ include: { items: true } }>> {
-    const budget = await this.budgetReader.ensureExists(id);
+    const budget = await this.budgetReader.ensureExists(workshopId, id);
 
     if (budget.status !== BudgetStatus.PENDENTE) {
       throw new BadRequestException('Apenas orcamentos pendentes podem ser atualizados');
@@ -29,6 +30,7 @@ export class UpdateBudgetUseCase {
 
     if (updateBudgetDto.clientId || updateBudgetDto.vehicleId) {
       await this.referenceValidator.validate(
+        workshopId,
         updateBudgetDto.clientId ?? budget.clientId,
         updateBudgetDto.vehicleId ?? budget.vehicleId,
       );
@@ -41,16 +43,16 @@ export class UpdateBudgetUseCase {
         )
       : undefined;
     const itemReferences = updateBudgetDto.items
-      ? await this.itemReferenceService.loadAndValidate(updateBudgetDto.items)
+      ? await this.itemReferenceService.loadAndValidate(workshopId, updateBudgetDto.items)
       : undefined;
 
     return this.prisma.$transaction(async (tx) => {
       if (updateBudgetDto.items) {
-        await tx.budgetItem.deleteMany({ where: { budgetId: id } });
+        await tx.budgetItem.deleteMany({ where: { budgetId: id, budget: { workshopId } } });
       }
 
       return tx.budget.update({
-        where: { id },
+        where: { id_workshopId: { id, workshopId } },
         data: {
           clientId: updateBudgetDto.clientId,
           vehicleId: updateBudgetDto.vehicleId,

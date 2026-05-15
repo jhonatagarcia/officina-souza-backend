@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, ServiceOrderStatus } from '@prisma/client';
 import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
+import { requireWorkshopId } from 'src/common/tenant/tenant-context';
+import type { RequestUser } from 'src/common/types/request-user.type';
 import { buildSafeOrderBy } from 'src/common/utils/order-by.util';
 import { buildPaginationMeta, PaginatedResponse } from 'src/common/utils/pagination.util';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -43,16 +45,26 @@ export class ServiceOrdersService {
     private readonly updateServiceOrderStatusUseCase: UpdateServiceOrderStatusUseCase,
   ) {}
 
-  async create(createServiceOrderDto: CreateServiceOrderDto): Promise<ServiceOrderResponseDto> {
-    const serviceOrder = await this.createServiceOrderUseCase.execute(createServiceOrderDto);
+  async create(
+    user: RequestUser,
+    createServiceOrderDto: CreateServiceOrderDto,
+  ): Promise<ServiceOrderResponseDto> {
+    const workshopId = requireWorkshopId(user);
+    const serviceOrder = await this.createServiceOrderUseCase.execute(
+      workshopId,
+      createServiceOrderDto,
+    );
 
     return toServiceOrderResponseDto(serviceOrder);
   }
 
   async findAll(
+    user: RequestUser,
     pagination: PaginationQueryDto,
   ): Promise<PaginatedResponse<ServiceOrderListResponseDto>> {
+    const workshopId = requireWorkshopId(user);
     const where: Prisma.ServiceOrderWhereInput = {
+      workshopId,
       ...(pagination.search
         ? {
             OR: [
@@ -92,9 +104,10 @@ export class ServiceOrdersService {
     };
   }
 
-  async findOne(id: string): Promise<ServiceOrderDetailResponseDto> {
+  async findOne(user: RequestUser, id: string): Promise<ServiceOrderDetailResponseDto> {
+    const workshopId = requireWorkshopId(user);
     const serviceOrder = await this.prisma.serviceOrder.findUnique({
-      where: { id },
+      where: { id_workshopId: { id, workshopId } },
       include: {
         budget: {
           include: {
@@ -123,10 +136,12 @@ export class ServiceOrdersService {
   }
 
   async update(
+    user: RequestUser,
     id: string,
     updateServiceOrderDto: UpdateServiceOrderDto,
   ): Promise<ServiceOrderResponseDto> {
-    const currentServiceOrder = await this.ensureExists(id);
+    const workshopId = requireWorkshopId(user);
+    const currentServiceOrder = await this.ensureExists(workshopId, id);
     const updateData: Prisma.ServiceOrderUncheckedUpdateInput = {
       clientId: updateServiceOrderDto.clientId,
       vehicleId: updateServiceOrderDto.vehicleId,
@@ -144,6 +159,7 @@ export class ServiceOrdersService {
       updateServiceOrderDto.mechanicId
     ) {
       await this.referenceValidator.validate(
+        workshopId,
         updateServiceOrderDto.clientId ?? currentServiceOrder.clientId,
         updateServiceOrderDto.vehicleId ?? currentServiceOrder.vehicleId,
         updateServiceOrderDto.mechanicId ?? currentServiceOrder.mechanicId ?? undefined,
@@ -157,7 +173,7 @@ export class ServiceOrdersService {
     }
 
     const updatedServiceOrder = await this.prisma.serviceOrder.update({
-      where: { id },
+      where: { id_workshopId: { id, workshopId } },
       data: updateData,
     });
 
@@ -165,10 +181,16 @@ export class ServiceOrdersService {
   }
 
   async updateStatus(
+    user: RequestUser,
     id: string,
     updateStatusDto: UpdateServiceOrderStatusDto,
   ): Promise<ServiceOrderStatusUpdateResponseDto> {
-    const result = await this.updateServiceOrderStatusUseCase.execute(id, updateStatusDto);
+    const workshopId = requireWorkshopId(user);
+    const result = await this.updateServiceOrderStatusUseCase.execute(
+      workshopId,
+      id,
+      updateStatusDto,
+    );
 
     return {
       ...toServiceOrderResponseDto(result.serviceOrder),
@@ -177,19 +199,29 @@ export class ServiceOrdersService {
   }
 
   async addPart(
+    user: RequestUser,
     serviceOrderId: string,
     addPartDto: AddServiceOrderPartDto,
   ): Promise<ServiceOrderPartResponseDto> {
-    const part = await this.addServiceOrderPartUseCase.execute(serviceOrderId, addPartDto);
+    const workshopId = requireWorkshopId(user);
+    const part = await this.addServiceOrderPartUseCase.execute(
+      workshopId,
+      serviceOrderId,
+      addPartDto,
+    );
 
     return toServiceOrderPartResponseDto(part);
   }
 
-  async listParts(serviceOrderId: string): Promise<ServiceOrderPartResponseDto[]> {
-    await this.ensureExists(serviceOrderId);
+  async listParts(
+    user: RequestUser,
+    serviceOrderId: string,
+  ): Promise<ServiceOrderPartResponseDto[]> {
+    const workshopId = requireWorkshopId(user);
+    await this.ensureExists(workshopId, serviceOrderId);
 
     const parts = await this.prisma.serviceOrderPart.findMany({
-      where: { serviceOrderId },
+      where: { serviceOrderId, serviceOrder: { workshopId } },
       include: { inventoryItem: true },
       orderBy: { createdAt: 'asc' },
     });
@@ -197,9 +229,9 @@ export class ServiceOrdersService {
     return parts.map(toServiceOrderPartResponseDto);
   }
 
-  async ensureExists(id: string) {
+  async ensureExists(workshopId: string, id: string) {
     const serviceOrder = await this.prisma.serviceOrder.findUnique({
-      where: { id },
+      where: { id_workshopId: { id, workshopId } },
     });
 
     if (!serviceOrder) {

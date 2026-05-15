@@ -72,26 +72,67 @@ enum InventoryMovementType {
   ADJUSTMENT
 }
 
+model Workshop {
+  id        String   @id @default(uuid()) @db.Uuid
+  tradeName String
+  cnpj      String?  @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  users     User[]
+  clients   Client[]
+  vehicles  Vehicle[]
+  budgets   Budget[]
+  serviceOrders ServiceOrder[]
+  inventoryItems InventoryItem[]
+  serviceCatalogItems ServiceCatalogItem[]
+  inventoryMovements InventoryMovement[]
+  financialEntries FinancialEntry[]
+  vehicleHistoryEntries VehicleHistory[]
+
+  @@index([isActive, createdAt])
+}
+
 model User {
-  id             String         @id @default(uuid()) @db.Uuid
-  name           String
-  email          String         @unique
-  passwordHash   String
-  role           Role
-  isActive       Boolean        @default(true)
-  lastLoginAt    DateTime?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  serviceOrders  ServiceOrder[] @relation("MechanicServiceOrders")
+  id                  String               @id @default(uuid()) @db.Uuid
+  workshopId          String?              @db.Uuid
+  name                String
+  email               String               @unique
+  passwordHash        String
+  role                Role
+  isActive            Boolean              @default(true)
+  lastLoginAt         DateTime?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  workshop            Workshop?            @relation(fields: [workshopId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  serviceOrders       ServiceOrder[]       @relation("MechanicServiceOrders")
+  passwordResetTokens PasswordResetToken[]
 
   @@index([role, isActive])
   @@index([isActive, createdAt])
+  @@index([workshopId])
+  @@index([workshopId, role, isActive])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([expiresAt])
+  @@index([usedAt])
 }
 
 model Client {
   id               String           @id @default(uuid()) @db.Uuid
+  workshopId       String           @db.Uuid
   name             String
-  document         String?          @unique
+  document         String?
   phone            String?
   email            String?
   notes            String?
@@ -102,16 +143,20 @@ model Client {
   budgets          Budget[]
   serviceOrders    ServiceOrder[]
   financialEntries FinancialEntry[]
+  workshop         Workshop         @relation(fields: [workshopId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
-  @@index([name])
-  @@index([document])
-  @@index([isActive, name])
+  @@unique([workshopId, document])
+  @@unique([id, workshopId])
+  @@index([workshopId, name])
+  @@index([workshopId, document])
+  @@index([workshopId, isActive, name])
 }
 
 model Vehicle {
   id                String             @id @default(uuid()) @db.Uuid
+  workshopId        String             @db.Uuid
   clientId          String             @db.Uuid
-  plate             String             @unique
+  plate             String
   brand             String
   model             String
   year              Int
@@ -125,16 +170,21 @@ model Vehicle {
   budgets           Budget[]
   serviceOrders     ServiceOrder[]
   historyEntries    VehicleHistory[]
+  workshop          Workshop           @relation(fields: [workshopId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
+  @@unique([workshopId, plate])
+  @@unique([id, workshopId])
   @@unique([id, clientId])
-  @@index([clientId])
-  @@index([plate])
-  @@index([clientId, createdAt])
+  @@unique([id, clientId, workshopId])
+  @@index([workshopId, clientId])
+  @@index([workshopId, plate])
+  @@index([workshopId, clientId, createdAt])
 }
 
 model Budget {
   id                     String         @id @default(uuid()) @db.Uuid
-  code                   String         @unique
+  workshopId             String         @db.Uuid
+  code                   String
   clientId               String         @db.Uuid
   vehicleId              String         @db.Uuid
   status                 BudgetStatus   @default(PENDENTE)
@@ -152,12 +202,15 @@ model Budget {
   vehicle                Vehicle        @relation(fields: [vehicleId, clientId], references: [id, clientId], onDelete: Restrict, onUpdate: Cascade)
   items                  BudgetItem[]
   serviceOrder           ServiceOrder?
+  workshop               Workshop       @relation(fields: [workshopId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
-  @@index([clientId])
-  @@index([vehicleId])
-  @@index([status])
-  @@index([clientId, status, createdAt])
-  @@index([vehicleId, status, createdAt])
+  @@unique([workshopId, code])
+  @@unique([id, workshopId])
+  @@index([workshopId, clientId])
+  @@index([workshopId, vehicleId])
+  @@index([workshopId, status])
+  @@index([workshopId, clientId, status, createdAt])
+  @@index([workshopId, vehicleId, status, createdAt])
 }
 
 model BudgetItem {
@@ -185,7 +238,8 @@ model BudgetItem {
 
 model ServiceOrder {
   id                 String               @id @default(uuid()) @db.Uuid
-  orderNumber        String               @unique
+  workshopId         String               @db.Uuid
+  orderNumber        String
   budgetId           String?              @unique @db.Uuid
   clientId           String               @db.Uuid
   vehicleId          String               @db.Uuid
@@ -210,21 +264,27 @@ model ServiceOrder {
   financialEntries   FinancialEntry[]
   historyEntries     VehicleHistory[]
   inventoryMovements InventoryMovement[]
+  workshop            Workshop             @relation(fields: [workshopId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
+  @@unique([workshopId, orderNumber])
+  @@unique([workshopId, budgetId])
+  @@unique([id, workshopId])
   @@unique([id, clientId])
-  @@index([clientId])
-  @@index([vehicleId])
-  @@index([mechanicId])
-  @@index([status])
-  @@index([status, openedAt])
-  @@index([vehicleId, status, openedAt])
-  @@index([mechanicId, status, openedAt])
+  @@unique([id, clientId, workshopId])
+  @@index([workshopId, clientId])
+  @@index([workshopId, vehicleId])
+  @@index([workshopId, mechanicId])
+  @@index([workshopId, status])
+  @@index([workshopId, status, openedAt])
+  @@index([workshopId, vehicleId, status, openedAt])
+  @@index([workshopId, mechanicId, status, openedAt])
 }
 
 model InventoryItem {
   id                String           @id @default(uuid()) @db.Uuid
+  workshopId        String           @db.Uuid
   name              String
-  internalCode      String           @unique
+  internalCode      String
   category          String?
   supplier          String?
   quantity          Int              @default(0)
@@ -236,15 +296,19 @@ model InventoryItem {
   budgetItems       BudgetItem[]
   serviceOrderParts ServiceOrderPart[]
   movements         InventoryMovement[]
+  workshop          Workshop         @relation(fields: [workshopId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
-  @@index([name])
-  @@index([internalCode])
-  @@index([category, name])
+  @@unique([workshopId, internalCode])
+  @@unique([id, workshopId])
+  @@index([workshopId, name])
+  @@index([workshopId, internalCode])
+  @@index([workshopId, category, name])
 }
 
 model ServiceCatalogItem {
   id                  String                @id @default(uuid()) @db.Uuid
-  code                String                @unique
+  workshopId          String                @db.Uuid
+  code                String
   name                String
   category            String
   description         String?
@@ -259,13 +323,16 @@ model ServiceCatalogItem {
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
   budgetItems         BudgetItem[]
+  workshop            Workshop              @relation(fields: [workshopId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
-  @@index([category])
-  @@index([name])
-  @@index([active])
-  @@index([createdAt])
-  @@index([active, category, name])
-  @@index([active, createdAt])
+  @@unique([workshopId, code])
+  @@unique([id, workshopId])
+  @@index([workshopId, category])
+  @@index([workshopId, name])
+  @@index([workshopId, active])
+  @@index([workshopId, createdAt])
+  @@index([workshopId, active, category, name])
+  @@index([workshopId, active, createdAt])
 }
 
 model ServiceOrderPart {
@@ -289,6 +356,7 @@ model ServiceOrderPart {
 
 model InventoryMovement {
   id                 String                @id @default(uuid()) @db.Uuid
+  workshopId         String                @db.Uuid
   inventoryItemId    String                @db.Uuid
   serviceOrderId     String?               @db.Uuid
   serviceOrderPartId String?               @db.Uuid
@@ -303,15 +371,17 @@ model InventoryMovement {
   inventoryItem      InventoryItem         @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   serviceOrder       ServiceOrder?         @relation(fields: [serviceOrderId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   serviceOrderPart   ServiceOrderPart?     @relation(fields: [serviceOrderPartId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  workshop           Workshop              @relation(fields: [workshopId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
-  @@index([inventoryItemId, createdAt])
-  @@index([serviceOrderId])
-  @@index([serviceOrderPartId])
-  @@index([type, createdAt])
+  @@index([workshopId, inventoryItemId, createdAt])
+  @@index([workshopId, serviceOrderId])
+  @@index([workshopId, serviceOrderPartId])
+  @@index([workshopId, type, createdAt])
 }
 
 model FinancialEntry {
   id              String             @id @default(uuid()) @db.Uuid
+  workshopId      String             @db.Uuid
   type            FinancialEntryType
   description     String
   category        String
@@ -327,18 +397,21 @@ model FinancialEntry {
   updatedAt       DateTime           @updatedAt
   client          Client?            @relation(fields: [clientId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   serviceOrder    ServiceOrder?      @relation(fields: [serviceOrderId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  workshop        Workshop           @relation(fields: [workshopId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
-  @@index([type])
-  @@index([status])
-  @@index([dueDate])
-  @@index([clientId])
-  @@index([serviceOrderId])
-  @@index([status, dueDate])
-  @@index([type, status, dueDate])
+  @@unique([id, workshopId])
+  @@index([workshopId, type])
+  @@index([workshopId, status])
+  @@index([workshopId, dueDate])
+  @@index([workshopId, clientId])
+  @@index([workshopId, serviceOrderId])
+  @@index([workshopId, status, dueDate])
+  @@index([workshopId, type, status, dueDate])
 }
 
 model VehicleHistory {
   id               String        @id @default(uuid()) @db.Uuid
+  workshopId       String        @db.Uuid
   vehicleId        String        @db.Uuid
   serviceOrderId   String?       @unique @db.Uuid
   entryDate        DateTime
@@ -350,7 +423,9 @@ model VehicleHistory {
   updatedAt        DateTime      @updatedAt
   vehicle          Vehicle       @relation(fields: [vehicleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   serviceOrder     ServiceOrder? @relation(fields: [serviceOrderId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  workshop         Workshop      @relation(fields: [workshopId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
-  @@index([vehicleId, entryDate])
-  @@index([entryDate])
+  @@unique([workshopId, serviceOrderId])
+  @@index([workshopId, vehicleId, entryDate])
+  @@index([workshopId, entryDate])
 }

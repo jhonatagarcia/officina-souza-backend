@@ -21,6 +21,8 @@ import { RejectBudgetUseCase } from 'src/budgets/use-cases/reject-budget.use-cas
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateBudgetDto } from 'src/budgets/dto/create-budget.dto';
 import { UpdateBudgetDto } from 'src/budgets/dto/update-budget.dto';
+import { requireWorkshopId } from 'src/common/tenant/tenant-context';
+import type { RequestUser } from 'src/common/types/request-user.type';
 
 const BUDGET_ORDERABLE_FIELDS = new Set([
   'createdAt',
@@ -40,16 +42,20 @@ export class BudgetsService {
     private readonly rejectBudgetUseCase: RejectBudgetUseCase,
   ) {}
 
-  async create(createBudgetDto: CreateBudgetDto): Promise<BudgetResponseDto> {
-    const budget = await this.createBudgetUseCase.execute(createBudgetDto);
+  async create(user: RequestUser, createBudgetDto: CreateBudgetDto): Promise<BudgetResponseDto> {
+    const workshopId = requireWorkshopId(user);
+    const budget = await this.createBudgetUseCase.execute(workshopId, createBudgetDto);
 
     return toBudgetResponseDto(budget);
   }
 
   async findAll(
+    user: RequestUser,
     pagination: PaginationQueryDto,
   ): Promise<PaginatedResponse<BudgetDetailResponseDto>> {
+    const workshopId = requireWorkshopId(user);
     const where: Prisma.BudgetWhereInput = {
+      workshopId,
       ...(pagination.search
         ? {
             OR: [
@@ -85,9 +91,10 @@ export class BudgetsService {
     };
   }
 
-  async findOne(id: string): Promise<BudgetDetailResponseDto> {
+  async findOne(user: RequestUser, id: string): Promise<BudgetDetailResponseDto> {
+    const workshopId = requireWorkshopId(user);
     const budget = await this.prisma.budget.findUnique({
-      where: { id },
+      where: { id_workshopId: { id, workshopId } },
       include: { client: true, vehicle: true, items: true, serviceOrder: true },
     });
 
@@ -98,34 +105,41 @@ export class BudgetsService {
     return toBudgetDetailResponseDto(budget);
   }
 
-  async update(id: string, updateBudgetDto: UpdateBudgetDto): Promise<BudgetResponseDto> {
-    const budget = await this.updateBudgetUseCase.execute(id, updateBudgetDto);
+  async update(
+    user: RequestUser,
+    id: string,
+    updateBudgetDto: UpdateBudgetDto,
+  ): Promise<BudgetResponseDto> {
+    const workshopId = requireWorkshopId(user);
+    const budget = await this.updateBudgetUseCase.execute(workshopId, id, updateBudgetDto);
 
     return toBudgetResponseDto(budget);
   }
 
-  async approve(id: string): Promise<BudgetResponseDto> {
-    const budget = await this.approveBudgetUseCase.execute(id);
+  async approve(user: RequestUser, id: string): Promise<BudgetResponseDto> {
+    const workshopId = requireWorkshopId(user);
+    const budget = await this.approveBudgetUseCase.execute(workshopId, id);
 
     return toBudgetResponseDto({ ...budget, items: [] });
   }
 
-  async reject(id: string): Promise<BudgetResponseDto> {
-    const budget = await this.rejectBudgetUseCase.execute(id);
+  async reject(user: RequestUser, id: string): Promise<BudgetResponseDto> {
+    const workshopId = requireWorkshopId(user);
+    const budget = await this.rejectBudgetUseCase.execute(workshopId, id);
 
     return toBudgetResponseDto({ ...budget, items: [] });
   }
 
-  async markConverted(id: string, tx: Prisma.TransactionClient) {
+  async markConverted(workshopId: string, id: string, tx: Prisma.TransactionClient) {
     return tx.budget.update({
-      where: { id },
+      where: { id_workshopId: { id, workshopId } },
       data: { convertedToServiceOrder: true },
     });
   }
 
-  async assertCanConvert(id: string, tx: Prisma.TransactionClient) {
+  async assertCanConvert(workshopId: string, id: string, tx: Prisma.TransactionClient) {
     const budget = await tx.budget.findUnique({
-      where: { id },
+      where: { id_workshopId: { id, workshopId } },
       include: { items: true, serviceOrder: true },
     });
 

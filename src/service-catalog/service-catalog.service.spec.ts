@@ -7,6 +7,13 @@ import { ServiceMaterialSource } from 'src/common/enums/service-material-source.
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ServiceCatalogService } from 'src/service-catalog/service-catalog.service';
 
+const tenantUser = {
+  sub: 'user-1',
+  email: 'admin@local.com',
+  role: 'ADMIN' as const,
+  workshopId: 'workshop-1',
+};
+
 describe('ServiceCatalogService', () => {
   let service: ServiceCatalogService;
 
@@ -52,7 +59,7 @@ describe('ServiceCatalogService', () => {
       updatedAt: new Date(),
     });
 
-    const result = await service.create({
+    const result = await service.create(tenantUser, {
       code: 'srv-001',
       name: 'Troca de oleo',
       category: 'manutencao',
@@ -96,7 +103,7 @@ describe('ServiceCatalogService', () => {
       updatedAt: new Date(),
     });
 
-    await service.create({
+    await service.create(tenantUser, {
       name: 'Alinhamento',
       category: 'suspensao',
       laborPrice: 100,
@@ -117,7 +124,7 @@ describe('ServiceCatalogService', () => {
     prismaMock.serviceCatalogItem.findFirst.mockResolvedValue({ id: 'svc-1' });
 
     await expect(
-      service.create({
+      service.create(tenantUser, {
         code: 'SRV-001',
         name: 'Troca de oleo',
         category: 'manutencao',
@@ -133,7 +140,7 @@ describe('ServiceCatalogService', () => {
     prismaMock.serviceCatalogItem.findFirst.mockResolvedValue(null);
 
     await expect(
-      service.create({
+      service.create(tenantUser, {
         code: 'SRV-001',
         name: 'Troca de oleo',
         category: 'manutencao',
@@ -149,7 +156,7 @@ describe('ServiceCatalogService', () => {
     prismaMock.serviceCatalogItem.findFirst.mockResolvedValue(null);
 
     await expect(
-      service.create({
+      service.create(tenantUser, {
         code: 'SRV-002',
         name: 'Mao de obra avulsa',
         category: 'geral',
@@ -187,7 +194,7 @@ describe('ServiceCatalogService', () => {
       1,
     ]);
 
-    const result = await service.findAll({
+    const result = await service.findAll(tenantUser, {
       page: 1,
       limit: 10,
       sortOrder: 'desc',
@@ -195,11 +202,11 @@ describe('ServiceCatalogService', () => {
 
     expect(prismaMock.serviceCatalogItem.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: {},
+        where: { workshopId: 'workshop-1' },
       }),
     );
     expect(prismaMock.serviceCatalogItem.count).toHaveBeenCalledWith({
-      where: {},
+      where: { workshopId: 'workshop-1' },
     });
     expect(prismaMock.$transaction).toHaveBeenCalledWith(['findManyResult', 'countResult']);
     expect(result.meta.total).toBe(1);
@@ -248,8 +255,8 @@ describe('ServiceCatalogService', () => {
         updatedAt: new Date(),
       });
 
-    const activated = await service.activate('svc-1');
-    const deactivated = await service.deactivate('svc-1');
+    const activated = await service.activate(tenantUser, 'svc-1');
+    const deactivated = await service.deactivate(tenantUser, 'svc-1');
 
     expect(activated.active).toBe(true);
     expect(deactivated.active).toBe(false);
@@ -258,6 +265,6 @@ describe('ServiceCatalogService', () => {
   it('should throw not found when activating non existing item', async () => {
     prismaMock.serviceCatalogItem.findUnique.mockResolvedValue(null);
 
-    await expect(service.activate('missing')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.activate(tenantUser, 'svc-1')).rejects.toBeInstanceOf(NotFoundException);
   });
 });
