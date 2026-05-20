@@ -919,6 +919,12 @@ Variáveis reais do projeto:
 | `JWT_ISSUER`          | Produção    | Emissor esperado no JWT                   |
 | `JWT_AUDIENCE`        | Produção    | Audiência esperada no JWT                 |
 | `BCRYPT_SALT_ROUNDS`  | Sim         | Custo bcrypt, entre 10 e 15               |
+| `PASSWORD_RESET_TOKEN_TTL_MINUTES` | Não | Validade do token de redefinição, entre 5 e 120 minutos |
+| `PASSWORD_RESET_APP_URL` | Produção | URL da tela frontend de redefinição de senha |
+| `PASSWORD_RESET_EMAIL_PROVIDER` | Produção | Provider de e-mail do reset: `noop` ou `webhook` |
+| `PASSWORD_RESET_EMAIL_FROM` | Não | Remetente enviado ao webhook de e-mail |
+| `PASSWORD_RESET_EMAIL_WEBHOOK_URL` | Quando `webhook` | Endpoint intermediário de envio de e-mail |
+| `PASSWORD_RESET_EMAIL_WEBHOOK_TOKEN` | Não | Token Bearer usado para autenticar o webhook intermediário |
 | `CORS_ORIGIN`         | Sim         | Origens permitidas, separadas por vírgula |
 | `CORS_CREDENTIALS`    | Não         | Habilita credenciais CORS                 |
 | `THROTTLE_TTL`        | Sim         | Janela de rate limit em segundos          |
@@ -935,8 +941,13 @@ Em produção, a validação bloqueia:
 - secrets fracos como `secret`, `changeme`, `change-me`, `jwt-secret`;
 - ausência de `JWT_ISSUER`;
 - ausência de `JWT_AUDIENCE`;
+- ausência de `PASSWORD_RESET_APP_URL` em produção;
+- `PASSWORD_RESET_EMAIL_PROVIDER=noop` em produção;
+- ausência de `PASSWORD_RESET_EMAIL_WEBHOOK_URL` quando `PASSWORD_RESET_EMAIL_PROVIDER=webhook`;
 - `ENABLE_SWAGGER=true`;
 - wildcard em `CORS_ORIGIN`.
+
+Quando `PASSWORD_RESET_EMAIL_PROVIDER=webhook`, o backend envia um `POST` para `PASSWORD_RESET_EMAIL_WEBHOOK_URL` com `Authorization: Bearer <PASSWORD_RESET_EMAIL_WEBHOOK_TOKEN>` quando o token estiver configurado. O payload contém `to`, `from`, `subject`, `text` e `html`; a rota intermediária deve validar o token e repassar o envio ao provedor real, como Resend, SendGrid ou Mailgun.
 
 ## 16. Como Rodar o Projeto
 

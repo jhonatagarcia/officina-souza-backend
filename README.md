@@ -112,11 +112,68 @@ Variáveis opcionais:
 | `REDIS_TLS`                       | Habilita TLS na conexão Redis quando `true`.                        |
 | `QUEUE_WHATSAPP_ATTEMPTS`         | Tentativas dos jobs de WhatsApp. Padrão: `5`.                       |
 | `QUEUE_WHATSAPP_BACKOFF_DELAY_MS` | Delay base do backoff exponencial. Padrão: `5000`.                  |
+| `PASSWORD_RESET_TOKEN_TTL_MINUTES` | Tempo de validade do token de redefinição de senha. Padrão: `30`.  |
+| `PASSWORD_RESET_APP_URL`          | URL da tela frontend de redefinição; o backend adiciona `?token=`.  |
+| `PASSWORD_RESET_EMAIL_PROVIDER`   | Provider de e-mail do reset: `noop` ou `webhook`.                   |
+| `PASSWORD_RESET_EMAIL_FROM`       | Remetente usado no payload enviado ao webhook.                      |
+| `PASSWORD_RESET_EMAIL_WEBHOOK_URL` | Endpoint intermediário que enviará o e-mail via Resend/SendGrid/etc. |
+| `PASSWORD_RESET_EMAIL_WEBHOOK_TOKEN` | Token Bearer enviado ao webhook intermediário.                    |
 | `SEED_ADMIN_EMAIL`                | E-mail do administrador criado pelo seed.                           |
 | `SEED_ADMIN_PASSWORD`             | Senha do administrador criado pelo seed.                            |
 | `SEED_ADMIN_NAME`                 | Nome do administrador criado pelo seed.                             |
 
-Em produção, a validação bloqueia `JWT_SECRET` fraco, `CORS_ORIGIN=*`, Swagger habilitado e ausência de `JWT_ISSUER`/`JWT_AUDIENCE`.
+Em produção, a validação bloqueia `JWT_SECRET` fraco, `CORS_ORIGIN=*`, Swagger habilitado, ausência de `JWT_ISSUER`/`JWT_AUDIENCE`, ausência de `PASSWORD_RESET_APP_URL` e `PASSWORD_RESET_EMAIL_PROVIDER=noop`.
+
+### E-mail de redefinição de senha via webhook
+
+Para enviar e-mails sem acoplar o backend a um provedor específico, configure um webhook intermediário:
+
+```env
+PASSWORD_RESET_EMAIL_PROVIDER=webhook
+PASSWORD_RESET_EMAIL_FROM=no-reply@seudominio.com
+PASSWORD_RESET_EMAIL_WEBHOOK_URL=https://seu-site.com/api/send-email
+PASSWORD_RESET_EMAIL_WEBHOOK_TOKEN=um-segredo-criado-por-voce
+```
+
+Gere o token com:
+
+```bash
+openssl rand -hex 32
+```
+
+O backend chama `PASSWORD_RESET_EMAIL_WEBHOOK_URL` com `POST`, `content-type: application/json` e, quando configurado, `Authorization: Bearer <PASSWORD_RESET_EMAIL_WEBHOOK_TOKEN>`. Payload enviado:
+
+```json
+{
+  "to": "cliente@example.com",
+  "from": "no-reply@seudominio.com",
+  "subject": "Redefinicao de senha",
+  "text": "conteudo em texto",
+  "html": "<p>conteudo em HTML</p>"
+}
+```
+
+Exemplo de rota intermediária em Next.js usando Resend:
+
+```ts
+import { Resend } from 'resend';
+
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+export async function POST(request: Request) {
+  const token = request.headers.get('authorization')?.replace('Bearer ', '');
+
+  if (token !== process.env.PASSWORD_RESET_EMAIL_WEBHOOK_TOKEN) {
+    return Response.json({ message: 'Unauthorized' }, { status: 401 });
+  }
+
+  const { to, from, subject, html, text } = await request.json();
+
+  await resend.emails.send({ to, from, subject, html, text });
+
+  return Response.json({ ok: true });
+}
+```
 
 ## Banco de dados, migrations e seed
 

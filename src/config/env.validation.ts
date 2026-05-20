@@ -222,6 +222,25 @@ class EnvironmentVariables {
   PASSWORD_RESET_APP_URL?: string;
 
   @IsOptional()
+  @IsIn(['noop', 'webhook'])
+  PASSWORD_RESET_EMAIL_PROVIDER?: 'noop' | 'webhook';
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  PASSWORD_RESET_EMAIL_FROM?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  PASSWORD_RESET_EMAIL_WEBHOOK_URL?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  PASSWORD_RESET_EMAIL_WEBHOOK_TOKEN?: string;
+
+  @IsOptional()
   @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
   CAPTCHA_ENABLED?: boolean;
@@ -244,6 +263,16 @@ class EnvironmentVariables {
   @IsOptional()
   @IsIn(['none', 'strict'])
   CAPTCHA_EXPECTED_ACTION?: 'none' | 'strict';
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  GOOGLE_CLIENT_ID?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  GOOGLE_CALLBACK_URL?: string;
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvironmentVariables {
@@ -295,16 +324,37 @@ function validateSecurityConstraints(config: EnvironmentVariables): void {
       securityErrors.push('ENABLE_SWAGGER nao pode ser true em producao');
     }
 
+    if (!config.PASSWORD_RESET_APP_URL?.trim()) {
+      securityErrors.push('PASSWORD_RESET_APP_URL deve ser definido em producao');
+    }
+
+    if (!config.PASSWORD_RESET_EMAIL_PROVIDER || config.PASSWORD_RESET_EMAIL_PROVIDER === 'noop') {
+      securityErrors.push('PASSWORD_RESET_EMAIL_PROVIDER deve ser configurado em producao');
+    }
+
     if (config.WHATSAPP_WEBHOOK_VERIFY_TOKEN?.trim() && !config.META_APP_SECRET?.trim()) {
       securityErrors.push(
         'META_APP_SECRET deve ser definido em producao quando webhook do WhatsApp estiver ativo',
       );
+    }
+
+    if (!config.GOOGLE_CLIENT_ID?.trim()) {
+      securityErrors.push('GOOGLE_CLIENT_ID deve ser definido em producao');
     }
   }
 
   if (config.CAPTCHA_ENABLED === true && (!config.CAPTCHA_SECRET || !config.CAPTCHA_VERIFY_URL)) {
     securityErrors.push(
       'CAPTCHA_SECRET e CAPTCHA_VERIFY_URL devem ser definidos quando CAPTCHA_ENABLED=true',
+    );
+  }
+
+  if (
+    config.PASSWORD_RESET_EMAIL_PROVIDER === 'webhook' &&
+    !config.PASSWORD_RESET_EMAIL_WEBHOOK_URL?.trim()
+  ) {
+    securityErrors.push(
+      'PASSWORD_RESET_EMAIL_WEBHOOK_URL deve ser definido quando PASSWORD_RESET_EMAIL_PROVIDER=webhook',
     );
   }
 

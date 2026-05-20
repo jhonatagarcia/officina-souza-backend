@@ -16,6 +16,8 @@ export class PasswordResetTokenService {
     const token = randomBytes(RESET_TOKEN_BYTES).toString('base64url');
     const expiresAt = new Date(Date.now() + this.getTtlMinutes() * 60_000);
 
+    await this.revokeActiveTokensForUser(userId);
+
     await this.prisma.passwordResetToken.create({
       data: {
         userId,
@@ -35,7 +37,7 @@ export class PasswordResetTokenService {
 
     const now = new Date();
 
-    if (!record || record.usedAt || record.expiresAt <= now) {
+    if (!record || record.usedAt || record.revokedAt || record.expiresAt <= now) {
       return null;
     }
 
@@ -47,6 +49,7 @@ export class PasswordResetTokenService {
       where: {
         id: record.id,
         usedAt: null,
+        revokedAt: null,
         expiresAt: { gt: now },
       },
       data: { usedAt: now },
@@ -56,13 +59,16 @@ export class PasswordResetTokenService {
   }
 
   async revokeActiveTokensForUser(userId: string): Promise<void> {
+    const now = new Date();
+
     await this.prisma.passwordResetToken.updateMany({
       where: {
         userId,
         usedAt: null,
-        expiresAt: { gt: new Date() },
+        revokedAt: null,
+        expiresAt: { gt: now },
       },
-      data: { usedAt: new Date() },
+      data: { revokedAt: now },
     });
   }
 

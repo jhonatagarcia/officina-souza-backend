@@ -19,6 +19,10 @@ describe('validateEnv security constraints', () => {
     THROTTLE_TTL: '60',
     THROTTLE_LIMIT: '100',
     LOG_LEVEL: 'info',
+    PASSWORD_RESET_APP_URL: 'https://app.example.com/reset-password',
+    PASSWORD_RESET_EMAIL_PROVIDER: 'webhook',
+    PASSWORD_RESET_EMAIL_WEBHOOK_URL: 'https://mail.example.com/send',
+    GOOGLE_CLIENT_ID: 'google-client-id.apps.googleusercontent.com',
   };
 
   it('should reject weak JWT secrets in production', () => {
@@ -71,6 +75,34 @@ describe('validateEnv security constraints', () => {
         WHATSAPP_WEBHOOK_VERIFY_TOKEN: 'verify-token',
       }),
     ).toThrow(/META_APP_SECRET/);
+  });
+
+  it('should require configured password reset email in production', () => {
+    expect(() =>
+      validateEnv({
+        ...baseConfig,
+        PASSWORD_RESET_EMAIL_PROVIDER: 'noop',
+      }),
+    ).toThrow(/PASSWORD_RESET_EMAIL_PROVIDER/);
+  });
+
+  it('should require Google client id in production', () => {
+    expect(() =>
+      validateEnv({
+        ...baseConfig,
+        GOOGLE_CLIENT_ID: '',
+      }),
+    ).toThrow(/GOOGLE_CLIENT_ID/);
+  });
+
+  it('should require webhook URL when password reset webhook provider is enabled', () => {
+    expect(() =>
+      validateEnv({
+        ...baseConfig,
+        NODE_ENV: 'development',
+        PASSWORD_RESET_EMAIL_WEBHOOK_URL: '',
+      }),
+    ).toThrow(/PASSWORD_RESET_EMAIL_WEBHOOK_URL/);
   });
 
   it('should accept Swagger disabled in production', () => {

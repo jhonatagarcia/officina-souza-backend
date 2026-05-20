@@ -16,9 +16,16 @@ export default () => ({
     jwtAudience: process.env.JWT_AUDIENCE ?? process.env.API_PREFIX,
     bcryptSaltRounds: Number(process.env.BCRYPT_SALT_ROUNDS),
   },
+  google: {
+    clientId: process.env.GOOGLE_CLIENT_ID,
+  },
   passwordReset: {
     tokenTtlMinutes: Number(process.env.PASSWORD_RESET_TOKEN_TTL_MINUTES ?? 30),
     appUrl: process.env.PASSWORD_RESET_APP_URL,
+    emailProvider: process.env.PASSWORD_RESET_EMAIL_PROVIDER ?? 'noop',
+    emailFrom: process.env.PASSWORD_RESET_EMAIL_FROM,
+    emailWebhookUrl: process.env.PASSWORD_RESET_EMAIL_WEBHOOK_URL,
+    emailWebhookToken: process.env.PASSWORD_RESET_EMAIL_WEBHOOK_TOKEN,
   },
   captcha: {
     enabled: process.env.CAPTCHA_ENABLED === 'true',

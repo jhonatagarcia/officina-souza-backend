@@ -43,6 +43,7 @@ import { WorkshopsModule } from 'src/workshops/workshops.module';
               'req.body.password',
               'req.body.passwordConfirmation',
               'req.body.token',
+              'req.body.credential',
               'req.body.captchaToken',
               'res.headers["set-cookie"]',
             ],

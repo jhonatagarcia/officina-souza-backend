@@ -1,15 +1,24 @@
-import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { Role, User, Workshop } from '@prisma/client';
+import { Prisma, Role, User, Workshop } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { randomBytes } from 'crypto';
 import { MessageResponseDto } from 'src/auth/dto/message-response.dto';
 import { AuthResponseDto } from 'src/auth/dto/auth-response.dto';
 import { ForgotPasswordDto } from 'src/auth/dto/forgot-password.dto';
+import { GoogleLoginDto } from 'src/auth/dto/google-login.dto';
 import { LoginDto } from 'src/auth/dto/login.dto';
 import { RegisterDto } from 'src/auth/dto/register.dto';
 import { ResetPasswordDto } from 'src/auth/dto/reset-password.dto';
 import { CaptchaService } from 'src/auth/services/captcha.service';
+import { GoogleIdentityService } from 'src/auth/services/google-identity.service';
 import { PasswordResetEmailService } from 'src/auth/services/password-reset-email.service';
 import { PasswordResetTokenService } from 'src/auth/services/password-reset-token.service';
 import type { RequestUser } from 'src/common/types/request-user.type';
@@ -25,12 +34,15 @@ type AuthContextUser = Omit<User, 'passwordHash'> & {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
     private readonly captchaService: CaptchaService,
+    private readonly googleIdentityService: GoogleIdentityService,
     private readonly passwordResetTokenService: PasswordResetTokenService,
     private readonly passwordResetEmailService: PasswordResetEmailService,
   ) {}
@@ -48,7 +60,103 @@ export class AuthService {
     });
   }
 
-  async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
+  async loginWithGoogle(dto: GoogleLoginDto): Promise<AuthResponseDto> {
+    const googleIdentity = await this.googleIdentityService.verifyCredential(dto.credential);
+    const linkedUser = await this.prisma.$transaction(async (tx) => {
+      const userByGoogleSubject = await tx.user.findUnique({
+        where: { googleSubject: googleIdentity.subject },
+      });
+
+      if (userByGoogleSubject) {
+        if (!userByGoogleSubject.isActive) {
+          throw new UnauthorizedException('Nao foi possivel autenticar com Google');
+        }
+
+        const workshopId =
+          userByGoogleSubject.workshopId ??
+          (await this.createGoogleWorkshopForStandaloneAdmin(
+            tx,
+            userByGoogleSubject.role,
+            googleIdentity.name,
+          ));
+
+        return tx.user.update({
+          where: { id: userByGoogleSubject.id },
+          data: {
+            workshopId,
+            googleEmailVerified: googleIdentity.emailVerified,
+            lastLoginAt: new Date(),
+          },
+        });
+      }
+
+      const userByEmail = await tx.user.findUnique({
+        where: { email: googleIdentity.email },
+      });
+
+      if (userByEmail) {
+        if (!userByEmail.isActive || userByEmail.googleSubject) {
+          throw new UnauthorizedException('Nao foi possivel autenticar com Google');
+        }
+
+        const workshopId =
+          userByEmail.workshopId ??
+          (await this.createGoogleWorkshopForStandaloneAdmin(
+            tx,
+            userByEmail.role,
+            googleIdentity.name,
+          ));
+
+        return tx.user.update({
+          where: { id: userByEmail.id },
+          data: {
+            workshopId,
+            googleSubject: googleIdentity.subject,
+            googleEmailVerified: googleIdentity.emailVerified,
+            googleLinkedAt: new Date(),
+            lastLoginAt: new Date(),
+          },
+        });
+      }
+
+      const passwordHash = await bcrypt.hash(
+        this.generateUnusablePassword(),
+        this.configService.getOrThrow<number>('auth.bcryptSaltRounds'),
+      );
+
+      const workshop = await tx.workshop.create({
+        data: {
+          tradeName: googleIdentity.name.trim(),
+          cnpj: null,
+          isActive: true,
+        },
+      });
+
+      return tx.user.create({
+        data: {
+          workshopId: workshop.id,
+          name: googleIdentity.name,
+          email: googleIdentity.email,
+          passwordHash,
+          googleSubject: googleIdentity.subject,
+          googleEmailVerified: googleIdentity.emailVerified,
+          googleLinkedAt: new Date(),
+          role: Role.ADMIN,
+          isActive: true,
+          lastLoginAt: new Date(),
+        },
+      });
+    });
+
+    return this.buildAuthResponse({
+      sub: linkedUser.id,
+      email: linkedUser.email,
+      role: linkedUser.role,
+      workshopId: linkedUser.workshopId,
+    });
+  }
+
+  async register(registerDto: RegisterDto): Promise<MessageResponseDto> {
     await this.captchaService.verify(registerDto.captchaToken, 'register');
 
     const email = this.normalizeEmail(registerDto.email);
@@ -63,7 +171,7 @@ export class AuthService {
       this.configService.getOrThrow<number>('auth.bcryptSaltRounds'),
     );
 
-    const result = await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx) => {
       const workshop = await tx.workshop.create({
         data: {
           tradeName: registerDto.tradeName.trim(),
@@ -86,12 +194,7 @@ export class AuthService {
       return { user, workshop };
     });
 
-    return this.buildAuthResponse({
-      sub: result.user.id,
-      email: result.user.email,
-      role: result.user.role,
-      workshopId: result.workshop.id,
-    });
+    return { message: 'Cadastro realizado com sucesso.' };
   }
 
   async forgotPassword(dto: ForgotPasswordDto): Promise<MessageResponseDto> {
@@ -109,7 +212,10 @@ export class AuthService {
           token: resetToken.token,
           expiresAt: resetToken.expiresAt,
         });
-      } catch {
+      } catch (error) {
+        this.logger.warn(
+          `Password reset email could not be delivered: ${this.formatErrorForLog(error)}`,
+        );
         // Keep the public response identical to avoid account enumeration.
       }
     }
@@ -128,8 +234,13 @@ export class AuthService {
       throw new BadRequestException('Token invalido ou expirado');
     }
 
+    const newPassword = dto.newPassword ?? dto.password;
+    if (!newPassword) {
+      throw new BadRequestException('Nova senha obrigatoria');
+    }
+
     const passwordHash = await bcrypt.hash(
-      dto.password,
+      newPassword,
       this.configService.getOrThrow<number>('auth.bcryptSaltRounds'),
     );
 
@@ -196,5 +307,37 @@ export class AuthService {
 
   private normalizeEmail(email: string): string {
     return email.trim().toLowerCase();
+  }
+
+  private formatErrorForLog(error: unknown): string {
+    if (error instanceof Error) {
+      return error.message;
+    }
+
+    return 'unknown error';
+  }
+
+  private async createGoogleWorkshopForStandaloneAdmin(
+    tx: Prisma.TransactionClient,
+    role: Role,
+    tradeName: string,
+  ): Promise<string | undefined> {
+    if (role !== Role.ADMIN) {
+      return undefined;
+    }
+
+    const workshop = await tx.workshop.create({
+      data: {
+        tradeName: tradeName.trim(),
+        cnpj: null,
+        isActive: true,
+      },
+    });
+
+    return workshop.id;
+  }
+
+  private generateUnusablePassword(): string {
+    return randomBytes(32).toString('hex');
   }
 }

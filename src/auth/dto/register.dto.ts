@@ -4,6 +4,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  ValidateIf,
   Matches,
   MaxLength,
   MinLength,
@@ -42,9 +43,16 @@ export class RegisterDto {
   password!: string;
 
   @ApiProperty()
+  @ValidateIf((dto: RegisterDto) => dto.passwordConfirmation !== undefined)
   @IsString()
   @Match('password', { message: 'passwordConfirmation must match password' })
   passwordConfirmation!: string;
+
+  @ApiPropertyOptional({ description: 'Alias aceito para passwordConfirmation.' })
+  @ValidateIf((dto: RegisterDto) => dto.passwordConfirmation === undefined)
+  @IsString()
+  @Match('password', { message: 'confirmPassword must match password' })
+  confirmPassword?: string;
 
   @ApiPropertyOptional({ description: 'Token de captcha quando CAPTCHA_ENABLED=true.' })
   @IsOptional()
